@@ -122,6 +122,53 @@ export class SpendTracker {
   }
 }
 
+// --- cycle numbers ---------------------------------------------------------
+
+/**
+ * Cycle numbers that carry on across runs, persisted to disk.
+ *
+ * Each `--once` is its own process. A count that restarted at 1 every time
+ * told the agent "cycle 1" while its own log showed earlier cycles, and
+ * stamped every hold record with the same number.
+ */
+export class CycleCounter {
+  private readonly path: string;
+  private lastCycle: number;
+
+  private constructor(path: string, last: number) {
+    this.path = path;
+    this.lastCycle = last;
+  }
+
+  static async load(path: string): Promise<CycleCounter> {
+    try {
+      const { last } = JSON.parse(await readFile(path, "utf8")) as { last?: unknown };
+      if (typeof last !== "number" || !Number.isInteger(last) || last < 0) {
+        throw new Error(`${path} does not hold a cycle count.`);
+      }
+      return new CycleCounter(path, last);
+    } catch (error) {
+      if ((error as { code?: string }).code === "ENOENT") return new CycleCounter(path, 0);
+      throw error;
+    }
+  }
+
+  get last(): number {
+    return this.lastCycle;
+  }
+
+  /** Claims the next cycle number and saves it before returning it. */
+  async next(): Promise<number> {
+    const cycle = this.lastCycle + 1;
+    await mkdir(dirname(this.path), { recursive: true });
+    const temp = `${this.path}.tmp`;
+    await writeFile(temp, JSON.stringify({ last: cycle }, null, 2), "utf8");
+    await rename(temp, this.path);
+    this.lastCycle = cycle;
+    return cycle;
+  }
+}
+
 // --- MCP <-> Claude --------------------------------------------------------
 
 export interface McpToolDescription {

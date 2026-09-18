@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
@@ -10,6 +10,7 @@ import {
   appendToLog,
   buildServerEnv,
   contextFromPositions,
+  CycleCounter,
   estimateCostUsd,
   formatReport,
   holdReason,
@@ -95,6 +96,26 @@ describe("SpendTracker", () => {
   it("refuses a nonsense budget", async () => {
     await expect(SpendTracker.load(join(dir, "s.json"), 0)).rejects.toThrow(RangeError);
     await expect(SpendTracker.load(join(dir, "s.json"), Number.NaN)).rejects.toThrow(RangeError);
+  });
+});
+
+describe("CycleCounter", () => {
+  it("starts at 1 and carries on across runs", async () => {
+    const path = join(dir, "cycles.json");
+    const first = await CycleCounter.load(path);
+    expect(first.last).toBe(0);
+    expect(await first.next()).toBe(1);
+    expect(await first.next()).toBe(2);
+
+    const second = await CycleCounter.load(path);
+    expect(second.last).toBe(2);
+    expect(await second.next()).toBe(3);
+  });
+
+  it("refuses a file that does not hold a count, rather than restarting at 1", async () => {
+    const path = join(dir, "cycles.json");
+    await writeFile(path, '{"last": "three"}', "utf8");
+    await expect(CycleCounter.load(path)).rejects.toThrow(/does not hold a cycle count/);
   });
 });
 

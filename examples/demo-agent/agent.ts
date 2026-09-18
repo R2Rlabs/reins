@@ -21,6 +21,7 @@ import {
   appendToLog,
   buildServerEnv,
   contextFromPositions,
+  CycleCounter,
   holdRecord,
   DEMO_MODELS,
   EFFORTS,
@@ -114,6 +115,7 @@ async function main(): Promise<void> {
   const logFile = join(dataDir, "decisions.jsonl");
 
   const spend = await SpendTracker.load(join(dataDir, "spend.json"), Number(values["budget-usd"]));
+  const cycles = await CycleCounter.load(join(dataDir, "cycles.json"));
   if (values["reset-spend"]) await spend.reset();
   if (spend.exhausted && !values.scripted) {
     fail(
@@ -178,7 +180,8 @@ async function main(): Promise<void> {
         `  data: ${dataDir}\n`,
     );
 
-    for (let cycle = 1; cycle <= maxCycles && !stopping; cycle++) {
+    for (let run = 1; run <= maxCycles && !stopping; run++) {
+      const cycle = await cycles.next();
       console.log(`[${new Date().toISOString().slice(0, 19)}Z] cycle ${cycle}`);
       try {
         const outcome = await runCycle(deps, cycle);
@@ -215,7 +218,7 @@ async function main(): Promise<void> {
         console.log(`  cycle ${cycle} failed: ${message}\n`);
       }
 
-      if (cycle < maxCycles && !stopping) {
+      if (run < maxCycles && !stopping) {
         try {
           await sleep(intervalMinutes * 60_000, undefined, { signal: wake.signal });
         } catch {
