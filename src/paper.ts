@@ -65,6 +65,8 @@ export interface RestingOrder {
   price: number;
   reduceOnly: boolean;
   placedAt: number;
+  /** Candles opening before this have been checked already. Absent on older saves. */
+  candlesCheckedFrom?: number;
 }
 
 export interface PaperFill {
@@ -385,6 +387,18 @@ export class PaperClient implements TradingClient {
 
   private async cancelOrderUnsafe(symbol: string, oid: number): Promise<CancelOutcome> {
     const state = await this.load();
+    // An order the market traded through since the last call has filled; the
+    // exchange would refuse to cancel it, so this must too.
+    await this.matchResting(state);
+    const filled = state.fills.find((fill) => fill.oid === oid && fill.symbol === symbol);
+    if (filled && !state.resting.some((order) => order.oid === oid)) {
+      return {
+        kind: "rejected",
+        message:
+          `Order ${oid} already filled: ${filled.side} ${filled.size} ${symbol} at ` +
+          `${filled.price}, ${new Date(filled.time).toISOString()}.`,
+      };
+    }
     const before = state.resting.length;
     state.resting = state.resting.filter(
       (order) => !(order.oid === oid && order.symbol === symbol),
@@ -417,42 +431,56 @@ export class PaperClient implements TradingClient {
   }
 
   /**
-   * Fill resting orders the market has traded through.
+   * Fill resting orders the market has traded through, including between polls.
    *
-   * A resting buy fills only once the best ask is strictly below its price —
-   * not merely equal to it. At your own price you are somewhere in a queue this
+   * A resting buy fills only once the market trades strictly below its price —
+   * not merely at it. At your own price you are somewhere in a queue this
    * simulation cannot see, so assuming a fill there would flatter the result.
+   * Strictly through is different: a trade cannot print below a resting bid, so
+   * once one has, that bid was taken.
+   *
+   * Two sources say whether that happened. The book now catches it at the
+   * moment of the call. One-minute candles since the order rested catch the
+   * dips in between, which the book alone missed: the demo agent's first
+   * breakout bid sat under a 5-minute dip that went unfilled, and the agent
+   * then cancelled an order the exchange would already have filled. Only
+   * candles that opened after the order was placed count, so the minute it was
+   * placed in never fills it. Orders fill in the order the market reached
+   * them, so a reduce-only order sees the position as it was at the time.
    */
   private async matchResting(state: PaperState): Promise<void> {
     if (state.resting.length === 0) return;
 
+    const now = this.now();
     const symbols = [...new Set(state.resting.map((order) => order.symbol))];
     const books = new Map<string, L2Book>();
+    const candles = new Map<string, Candle[]>();
     await Promise.all(
       symbols.map(async (symbol) => {
         books.set(symbol, await this.market.l2Book(symbol));
+        candles.set(symbol, await this.candlesSince(symbol, state.resting, now));
       }),
     );
 
+    const due: { order: RestingOrder; time: number }[] = [];
     const survivors: RestingOrder[] = [];
     let changed = false;
 
     for (const order of state.resting) {
-      const book = books.get(order.symbol);
-      if (!book) {
-        survivors.push(order);
+      const symbolCandles = candles.get(order.symbol) ?? [];
+      const time = tradedThroughAt(order, symbolCandles, books.get(order.symbol), now);
+      if (time !== undefined) {
+        due.push({ order, time });
         continue;
       }
-      const through =
-        order.side === "buy"
-          ? (bestAsk(book) ?? Infinity) < order.price
-          : (bestBid(book) ?? -Infinity) > order.price;
+      // Complete candles need not be read again; a still-forming one does.
+      const last = symbolCandles.at(-1);
+      if (last) order.candlesCheckedFrom = last.T < now ? last.T + 1 : last.t;
+      survivors.push(order);
+    }
 
-      if (!through) {
-        survivors.push(order);
-        continue;
-      }
-
+    due.sort((a, b) => a.time - b.time);
+    for (const { order, time } of due) {
       if (order.reduceOnly) {
         const held = state.positions[order.symbol]?.size ?? 0;
         const opposes =
@@ -463,20 +491,46 @@ export class PaperClient implements TradingClient {
         }
       }
 
-      this.applyFill(state, {
-        oid: order.oid,
-        symbol: order.symbol,
-        side: order.side,
-        size: order.size,
-        price: order.price,
-        liquidity: "maker",
-      });
+      this.applyFill(
+        state,
+        {
+          oid: order.oid,
+          symbol: order.symbol,
+          side: order.side,
+          size: order.size,
+          price: order.price,
+          liquidity: "maker",
+        },
+        time,
+      );
       changed = true;
     }
 
     if (changed || survivors.length !== state.resting.length) {
       state.resting = survivors;
       await this.persist();
+    }
+  }
+
+  /**
+   * One-minute candles covering every resting order on `symbol` since it was
+   * last checked. The API keeps the latest 5000, a little over three days, so
+   * an order resting longer than that is only checked across those. If the
+   * candles cannot be fetched, the book check still runs; the gap it leaves is
+   * the one this closes, not a wrong fill.
+   */
+  private async candlesSince(symbol: string, resting: RestingOrder[], now: number): Promise<Candle[]> {
+    const from = Math.min(
+      ...resting
+        .filter((order) => order.symbol === symbol)
+        .map((order) => Math.max(order.placedAt, order.candlesCheckedFrom ?? 0)),
+    );
+    const start = Math.max(from, now - 5_000 * 60_000);
+    if (start >= now) return [];
+    try {
+      return await this.market.candles(symbol, "1m", start, now);
+    } catch {
+      return [];
     }
   }
 
@@ -490,6 +544,7 @@ export class PaperClient implements TradingClient {
       price: number;
       liquidity: "taker" | "maker";
     },
+    time: number = this.now(),
   ): void {
     const signed = fill.side === "buy" ? fill.size : -fill.size;
     const notionalUsd = fill.size * fill.price;
@@ -508,9 +563,35 @@ export class PaperClient implements TradingClient {
       notionalUsd,
       feeUsd,
       realizedPnlUsd,
-      time: this.now(),
+      time,
     });
   }
+}
+
+/**
+ * When the market first traded strictly through a resting order, or undefined
+ * if it has not: the earliest one-minute candle that opened after the order
+ * rested and went through its price, else the book right now.
+ */
+export function tradedThroughAt(
+  order: RestingOrder,
+  candles: Candle[],
+  book: L2Book | undefined,
+  now: number,
+): number | undefined {
+  const from = Math.max(order.placedAt, order.candlesCheckedFrom ?? 0);
+  for (const candle of candles) {
+    if (candle.t < from) continue;
+    const through =
+      order.side === "buy" ? Number(candle.l) < order.price : Number(candle.h) > order.price;
+    if (through) return candle.t;
+  }
+  if (!book) return undefined;
+  const through =
+    order.side === "buy"
+      ? (bestAsk(book) ?? Infinity) < order.price
+      : (bestBid(book) ?? -Infinity) > order.price;
+  return through ? now : undefined;
 }
 
 /**

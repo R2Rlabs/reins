@@ -17,7 +17,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 281 tests, no network calls in any of them.
+Early, but real. 288 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -129,16 +129,25 @@ unchanged on live.
   them**, never merely to them. At your own price you are behind a queue this
   simulation cannot see; assuming a fill there is the most common way a paper
   equity curve lies.
+- **Fills between polls.** Each call checks resting orders against the
+  one-minute candles printed since they were placed, not just the book at that
+  moment, and fills them at the minute the market first went through. Cancelling
+  an order that already filled is refused, as the exchange would. Before this,
+  the demo agent's breakout bid went unfilled under a dip that lasted two
+  minutes, and it then cancelled an order Hyperliquid would already have filled.
 
 ### What it does not model
 
-Each of these flatters the result, so they are listed rather than buried:
+The first three flatter the result; the last two can miss a fill either way.
+All of them are listed rather than buried:
 
 - **Latency** — fills are priced off the book as it was when the tool was called
 - **Market impact** — your order never moves the price or removes liquidity
 - **Funding payments** on perps
-- **Book movement between polls** — a wick that would have filled a resting
-  order is missed unless a tool happens to be called while it is happening
+- **The minute an order was placed in** — candles are only counted from the
+  first minute that opened after it, so a dip in that same minute is missed
+- **Orders resting longer than about three days** — only the latest 5000
+  one-minute candles are available, so older stretches go unchecked
 
 **Treat a paper equity curve as an upper bound on live performance, not an
 estimate of it.**

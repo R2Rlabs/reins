@@ -44,9 +44,14 @@ class FakeMarket implements MarketDataSource {
     return this.current;
   }
   candleRequests: unknown[][] = [];
+  /** One-minute candles the market has printed; served by open time. */
+  candleData: Candle[] = [];
+  candlesFail = false;
   async candles(...args: [string, CandleInterval, number, number]): Promise<Candle[]> {
     this.candleRequests.push(args);
-    return [];
+    if (this.candlesFail) throw new Error("candleSnapshot unavailable");
+    const [coin, , start, end] = args;
+    return this.candleData.filter((c) => c.s === coin && c.t >= start && c.t <= end);
   }
   async assetInfo(symbol: string) {
     return { name: symbol, szDecimals: this.szDecimals, maxLeverage: 50, index: 0 };
@@ -71,6 +76,113 @@ describe("candles", () => {
   it("passes straight through to the live market", async () => {
     await client().candles("ETH", "15m", 10, 20);
     expect(market.candleRequests).toEqual([["ETH", "15m", 10, 20]]);
+  });
+});
+
+describe("fills between polls", () => {
+  const MINUTE = 60_000;
+  const placedAt = Date.UTC(2026, 8, 18, 18, 52, 49);
+
+  function minute(openTime: number, low: number, high: number): Candle {
+    return {
+      t: openTime,
+      T: openTime + MINUTE - 1,
+      s: "BTC",
+      i: "1m",
+      o: String(high),
+      c: String(high),
+      h: String(high),
+      l: String(low),
+      v: "1",
+      n: 1,
+    };
+  }
+
+  /** A client whose clock the test moves, with a bid resting at 99,995 since placedAt. */
+  async function restingBid() {
+    const clock = { ms: placedAt };
+    const paper = client({ now: () => clock.ms });
+    await paper.placeOrder({ symbol: "BTC", side: "buy", size: 1, price: 99_995 });
+    return { paper, clock };
+  }
+
+  it("fills a bid the market dipped through and recovered from before the next call", async () => {
+    // The demo's missed fill: ETH traded under the bid for two minutes, then ran.
+    const { paper, clock } = await restingBid();
+    const dip = Date.UTC(2026, 8, 18, 18, 57);
+    market.candleData = [minute(dip, 99_990, 100_010), minute(dip + MINUTE, 99_993, 100_020)];
+    clock.ms = Date.UTC(2026, 8, 18, 19, 23);
+    // The book has long recovered: the ask is above the bid again.
+    await paper.accountState();
+
+    const state = await paper.snapshot();
+    expect(state.resting).toHaveLength(0);
+    expect(state.fills).toMatchObject([
+      { oid: 1, side: "buy", price: 99_995, liquidity: "maker", time: dip },
+    ]);
+  });
+
+  it("does not count the minute the order was placed in", async () => {
+    const { paper, clock } = await restingBid();
+    // Opened 18:52:00, before the 18:52:49 placement: the low may have come first.
+    market.candleData = [minute(Date.UTC(2026, 8, 18, 18, 52), 99_900, 100_010)];
+    clock.ms = Date.UTC(2026, 8, 18, 19, 0);
+    await paper.accountState();
+    expect((await paper.snapshot()).fills).toHaveLength(0);
+  });
+
+  it("does not fill on a candle that only reached the price", async () => {
+    const { paper, clock } = await restingBid();
+    market.candleData = [minute(Date.UTC(2026, 8, 18, 18, 55), 99_995, 100_010)];
+    clock.ms = Date.UTC(2026, 8, 18, 19, 0);
+    await paper.accountState();
+    expect((await paper.snapshot()).resting).toHaveLength(1);
+  });
+
+  it("fills a resting sell on a candle that traded above it", async () => {
+    const clock = { ms: placedAt };
+    const paper = client({ now: () => clock.ms });
+    await paper.placeOrder({ symbol: "BTC", side: "sell", size: 1, price: 100_015 });
+    market.candleData = [minute(Date.UTC(2026, 8, 18, 18, 55), 100_000, 100_016)];
+    clock.ms = Date.UTC(2026, 8, 18, 19, 0);
+    await paper.accountState();
+    expect((await paper.snapshot()).fills).toMatchObject([{ side: "sell", price: 100_015 }]);
+  });
+
+  it("refuses to cancel an order the market already filled", async () => {
+    const { paper, clock } = await restingBid();
+    market.candleData = [minute(Date.UTC(2026, 8, 18, 18, 57), 99_990, 100_010)];
+    clock.ms = Date.UTC(2026, 8, 18, 19, 23);
+
+    const outcome = await paper.cancelOrder("BTC", 1);
+    expect(outcome).toMatchObject({ kind: "rejected" });
+    expect(outcome.kind === "rejected" && outcome.message).toMatch(/already filled.*99995.*18:57/);
+  });
+
+  it("falls back to the book when candles cannot be fetched", async () => {
+    const { paper, clock } = await restingBid();
+    market.candlesFail = true;
+    market.candleData = [minute(Date.UTC(2026, 8, 18, 18, 57), 99_990, 100_010)];
+    clock.ms = Date.UTC(2026, 8, 18, 19, 23);
+    await paper.accountState();
+    expect((await paper.snapshot()).resting).toHaveLength(1);
+
+    market.current = book([[99_980, 5]], [[99_990, 5]]);
+    await paper.accountState();
+    expect((await paper.snapshot()).fills).toHaveLength(1);
+  });
+
+  it("does not read the same complete candles twice", async () => {
+    const { paper, clock } = await restingBid();
+    const first = Date.UTC(2026, 8, 18, 18, 55);
+    market.candleData = [minute(first, 99_999, 100_010)];
+    clock.ms = Date.UTC(2026, 8, 18, 19, 0);
+    await paper.accountState();
+    clock.ms = Date.UTC(2026, 8, 18, 19, 30);
+    await paper.accountState();
+
+    const [, second] = market.candleRequests.filter((r) => r[1] === "1m");
+    expect(second?.[2]).toBe(first + MINUTE);
   });
 });
 

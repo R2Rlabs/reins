@@ -70,6 +70,7 @@ export {
   PaperClient,
   MemoryPaperStore,
   applyToPosition,
+  tradedThroughAt,
   walkBook,
   BASE_MAKER_FEE_RATE,
   BASE_TAKER_FEE_RATE,
