@@ -65,7 +65,27 @@ Options:
   --model <id>            ${DEMO_MODELS.join(" | ")} (default claude-opus-5).
   --effort <level>        ${EFFORTS.join(" | ")} (default high, the API default).
   --data-dir <path>       Where the log, paper account and spend live (default demo-data).
+  --idle-when-spent       On a spent budget, wait until stopped instead of exiting. For
+                          servers that restart whatever exits.
   --help`;
+
+/**
+ * For a server: sit still instead of exiting. A supervisor that restarts
+ * whatever exits would otherwise restart a demo with no budget left, watch it
+ * exit again, and loop. Ends on SIGINT or SIGTERM.
+ */
+function idleUntilStopped(): Promise<void> {
+  console.log("Idling until stopped (--idle-when-spent).");
+  const keepAlive = setInterval(() => undefined, 1 << 30);
+  return new Promise((resolve) => {
+    const stop = () => {
+      clearInterval(keepAlive);
+      resolve();
+    };
+    process.once("SIGINT", stop);
+    process.once("SIGTERM", stop);
+  });
+}
 
 function fail(message: string): never {
   console.error(`\n${message}\n`);
@@ -84,6 +104,7 @@ async function main(): Promise<void> {
       model: { type: "string", default: "claude-opus-5" },
       effort: { type: "string", default: "high" },
       "data-dir": { type: "string" },
+      "idle-when-spent": { type: "boolean", default: false },
       help: { type: "boolean", default: false },
     },
   });
@@ -118,10 +139,13 @@ async function main(): Promise<void> {
   const cycles = await CycleCounter.load(join(dataDir, "cycles.json"));
   if (values["reset-spend"]) await spend.reset();
   if (spend.exhausted && !values.scripted) {
-    fail(
+    const message =
       `The budget is spent: $${spend.spentUsd.toFixed(2)} of $${spend.budgetUsd.toFixed(2)}.\n` +
-        "Raise it with --budget-usd, or start over with --reset-spend.",
-    );
+      "Raise it with --budget-usd, or start over with --reset-spend.";
+    if (!values["idle-when-spent"]) fail(message);
+    console.log(message);
+    await idleUntilStopped();
+    return;
   }
 
   let callModel: CycleDeps["callModel"];
@@ -146,6 +170,7 @@ async function main(): Promise<void> {
   await mcp.connect(transport);
 
   let stopping = false;
+  let budgetSpent = false;
   const wake = new AbortController();
   process.on("SIGINT", () => {
     if (stopping) process.exit(130);
@@ -206,6 +231,7 @@ async function main(): Promise<void> {
         );
         if (outcome.stoppedBecause === "budget") {
           console.log("Budget reached. Stopping.");
+          budgetSpent = true;
           break;
         }
       } catch (error) {
@@ -232,6 +258,7 @@ async function main(): Promise<void> {
 
   console.log(`Decision log: ${logFile}\nSummarise it with: npm run demo:report${
     values.scripted ? " -- --data-dir demo-data/scripted" : ""}`);
+  if (budgetSpent && values["idle-when-spent"] && !stopping) await idleUntilStopped();
 }
 
 main().catch((error: unknown) => {

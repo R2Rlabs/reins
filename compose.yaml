@@ -1,0 +1,19 @@
+# docker compose up -d --build     start, or rebuild after updating the code
+# docker compose logs -f           watch it trade
+# docker compose stop              stop after the current cycle
+services:
+  demo:
+    build: .
+    # ANTHROPIC_API_KEY=... lives here, on the server only. Never committed.
+    env_file: .env
+    volumes:
+      # Paper account, decision log, spend and cycle count survive rebuilds.
+      - ./demo-data:/app/demo-data
+    init: true
+    # Comes back after a crash or a server reboot. A spent budget does not
+    # loop, because the demo idles instead of exiting (--idle-when-spent).
+    restart: unless-stopped
+    # The demo treats SIGINT as "finish this cycle, then stop", so a stop
+    # never cuts a cycle in half. A cycle takes a minute or two at most.
+    stop_signal: SIGINT
+    stop_grace_period: 3m

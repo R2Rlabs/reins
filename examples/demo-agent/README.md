@@ -35,6 +35,61 @@ holds separately from orders, and the agent reads its earlier holds back
 through `get_recent_decisions` like anything else it did. A cycle cut short
 by the budget, the step cap or a refusal is not a choice, so it writes no hold.
 
+## Run it on a server
+
+A laptop only runs the demo while it is awake. A small Linux server runs it
+around the clock, with the repo's `Dockerfile` and `compose.yaml`. It carries
+on from wherever `demo-data/` is — same paper account, log, spend and cycle
+count — and restarts itself after a crash or a reboot. Commands marked **PC**
+run in PowerShell in this folder; **server** ones after `ssh root@SERVER_IP`.
+
+1. **Create the server** with any provider: the smallest Ubuntu 24.04 LTS
+   machine (1 vCPU, 1–2 GB) is plenty. Add your SSH key while creating it. No
+   key yet? On the PC run `ssh-keygen -t ed25519` and paste the contents of
+   `~\.ssh\id_ed25519.pub`.
+2. **Install Docker** (server): `curl -fsSL https://get.docker.com | sh`
+3. **Stop the demo on the PC** with Ctrl+C, so two copies never write two
+   different histories.
+4. **Copy the code and the run across** (PC). Only committed code is packed:
+
+   ```powershell
+   git archive --format=tar.gz -o reins.tar.gz HEAD
+   tar -czf demo-data.tar.gz demo-data
+   scp reins.tar.gz demo-data.tar.gz root@SERVER_IP:
+   ```
+
+5. **Unpack, add the key, start** (server). The key is typed, not echoed, and
+   written to a `.env` only root can read:
+
+   ```bash
+   mkdir -p reins && tar -xzf reins.tar.gz -C reins && tar -xzf demo-data.tar.gz -C reins
+   cd reins && chown -R 1000:1000 demo-data
+   read -rsp "Anthropic API key: " KEY && printf 'ANTHROPIC_API_KEY=%s\n' "$KEY" > .env && chmod 600 .env && unset KEY
+   docker compose up -d --build
+   docker compose logs -f        # Ctrl+C leaves the log; the demo keeps running
+   ```
+
+**Checking in** — a summary on the server, or the whole run copied back to the
+PC (it replaces the PC's `demo-data/`, which is stale once the server has it):
+
+```bash
+ssh root@SERVER_IP "cd reins && docker compose exec demo node examples/demo-agent/report.ts"
+scp -r root@SERVER_IP:reins/demo-data .
+```
+
+**Updating the code**: repeat step 4 for `reins.tar.gz` only, then on the
+server `tar -xzf reins.tar.gz -C reins && cd reins && docker compose up -d --build`.
+The run's data is untouched.
+
+**Stopping**: `docker compose stop` finishes the current cycle first. When the
+budget runs out the demo stays up but idle (`--idle-when-spent`), so Docker's
+restart policy never loops; to give it more, add
+`command: ["node", "examples/demo-agent/agent.ts", "--idle-when-spent", "--budget-usd", "10"]`
+under `demo:` in `compose.yaml` and run `docker compose up -d`.
+
+The server holds your Anthropic key and nothing else secret: the demo is paper
+only, has no wallet key, and opens no ports.
+
 ## The account it trades
 
 | | |

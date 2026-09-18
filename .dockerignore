@@ -1,0 +1,8 @@
+node_modules
+dist
+demo-data
+design
+.git
+.env
+.env.*
+*.log
