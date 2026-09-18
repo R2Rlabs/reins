@@ -26,6 +26,15 @@ Each cycle is a fresh, bounded conversation: the agent recalls earlier cycles
 with `get_recent_decisions`, checks its limits, positions and the book, and
 decides whether to act. Doing nothing is a valid decision.
 
+Reins itself logs only actions, so when a cycle ends without a trade the demo
+appends a `hold` record to the same log, with the account state and, as the
+reason, the one-line `Held because:` the agent is asked to end on (its whole
+closing reply if it leaves that out; the full reply always prints to the
+console). Every cycle leaves a line, the report counts
+holds separately from orders, and the agent reads its earlier holds back
+through `get_recent_decisions` like anything else it did. A cycle cut short
+by the budget, the step cap or a refusal is not a choice, so it writes no hold.
+
 ## The account it trades
 
 | | |

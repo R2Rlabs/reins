@@ -1,14 +1,19 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DecisionRecord } from "../../src/decision-log.js";
+import { FileDecisionLog } from "../../src/decision-log-file.js";
 import { buildRequest, preview, runCycle, SYSTEM_PROMPT, type CycleDeps, type ToolCallOutcome } from "./cycle.ts";
 import {
+  appendToLog,
   buildServerEnv,
+  contextFromPositions,
   estimateCostUsd,
   formatReport,
+  holdReason,
+  holdRecord,
   mcpToolsToClaude,
   parseDecisionLog,
   SpendTracker,
@@ -341,6 +346,113 @@ describe("runCycle", () => {
   });
 });
 
+describe("runCycle, for holds", () => {
+  it("counts trading tools and keeps the reply that ended the cycle", async () => {
+    const { deps } = await harness([
+      message(
+        [
+          { type: "text", text: "Checking." },
+          { type: "tool_use", id: "a", name: "get_book", input: { symbol: "BTC" } },
+          { type: "tool_use", id: "b", name: "cancel_order", input: { oid: 1 } },
+        ],
+        "tool_use",
+      ),
+      message([{ type: "text", text: "Spread is wide; waiting." }], "end_turn"),
+    ]);
+    const outcome = await runCycle(deps, 1);
+    expect(outcome.actionsAttempted).toBe(1);
+    expect(outcome.finalText).toBe("Spread is wide; waiting.");
+  });
+
+  it("counts a refused order as an attempted action", async () => {
+    const { deps } = await harness(
+      [
+        message([{ type: "tool_use", id: "t", name: "place_order", input: {} }], "tool_use"),
+        message([{ type: "text", text: "Fine." }], "end_turn"),
+      ],
+      () => ({ text: "BLOCKED (POSITION_TOO_LARGE): over", isError: true }),
+    );
+    expect((await runCycle(deps, 1)).actionsAttempted).toBe(1);
+  });
+});
+
+describe("holdRecord", () => {
+  const at = new Date("2026-09-18T17:45:00Z");
+  const held = { stoppedBecause: "end_turn" as const, actionsAttempted: 0, finalText: " Book is thin; waiting. " };
+
+  it("records a cycle the agent ended without trading, in its own words", () => {
+    expect(holdRecord(held, 3, at)).toEqual({
+      id: "2026-09-18T17:45:00.000Z#hold",
+      time: "2026-09-18T17:45:00.000Z",
+      tool: "hold",
+      reason: "Book is thin; waiting.",
+      request: { cycle: 3 },
+    });
+  });
+
+  it("is not written when the agent traded, since those records exist already", () => {
+    expect(holdRecord({ ...held, actionsAttempted: 2 }, 1, at)).toBeUndefined();
+  });
+
+  it.each(["budget", "max_steps", "refusal", "max_tokens", "no_tool_calls"] as const)(
+    "is not written when the cycle stopped on %s rather than by choice",
+    (stoppedBecause) => {
+      expect(holdRecord({ ...held, stoppedBecause }, 1, at)).toBeUndefined();
+    },
+  );
+
+  it("stores only the Held because line when there is one", () => {
+    const finalText = [
+      "First cycle, one snapshot per market.",
+      "",
+      "BTC's book looks lopsided but that is one frame.",
+      "",
+      "**Held because:** no price history yet, and a single-snapshot",
+      "imbalance is too noisy to trade on.",
+    ].join("\n");
+    expect(holdRecord({ ...held, finalText }, 1, at)?.reason).toBe(
+      "no price history yet, and a single-snapshot imbalance is too noisy to trade on.",
+    );
+  });
+
+  it("keeps the whole reply when there is no Held because line", () => {
+    expect(holdReason("Nothing moved.\nWaiting.")).toBe("Nothing moved.\nWaiting.");
+    expect(holdReason("Held because:")).toBe("Held because:");
+  });
+
+  it("takes the last Held because line, however it is marked up", () => {
+    expect(holdReason("Held because: first\nmore\n- held because: second")).toBe("second");
+    expect(holdReason("HELD BECAUSE : caps")).toBe("caps");
+    expect(holdReason("I held because nothing moved.")).toBe("I held because nothing moved.");
+  });
+
+  it("says so when the agent gave no reason", () => {
+    expect(holdRecord({ ...held, finalText: "" }, 1, at)?.reason).toMatch(/without saying why/);
+  });
+
+  it("takes account state from a get_positions result", () => {
+    const text = JSON.stringify({ positionsUsd: { BTC: 500 }, accountValueUsd: 10_000, realizedPnlTodayUsd: -1.2 });
+    expect(contextFromPositions(text)).toEqual({
+      positionsUsd: { BTC: 500 },
+      accountValueUsd: 10_000,
+      realizedPnlTodayUsd: -1.2,
+    });
+    expect(contextFromPositions("Error: network")).toBeUndefined();
+    expect(contextFromPositions('{"accountValueUsd": 1}')).toBeUndefined();
+  });
+
+  it("lands in the log where get_recent_decisions reads it back", async () => {
+    const path = join(dir, "decisions.jsonl");
+    const serverLog = new FileDecisionLog(path);
+    await serverLog.append(record({ time: "2026-09-18T17:00:00.000Z" }));
+    await appendToLog(path, holdRecord(held, 2, at)!);
+
+    const [latest] = await serverLog.read(1);
+    expect(latest).toMatchObject({ tool: "hold", reason: "Book is thin; waiting." });
+    expect(parseDecisionLog(await readFile(path, "utf8"))).toHaveLength(2);
+  });
+});
+
 // --- reporting ---------------------------------------------------------------
 
 function record(overrides: Partial<DecisionRecord>): DecisionRecord {
@@ -365,6 +477,22 @@ describe("summarize", () => {
     ]);
     expect(summary).toMatchObject({ placed: 2, filled: 1, rejectedByExchange: 1, errors: 1 });
     expect(summary.refusedByLimits).toHaveLength(1);
+  });
+
+  it("counts holds on their own, not as orders", () => {
+    const hold = holdRecord(
+      { stoppedBecause: "end_turn", actionsAttempted: 0, finalText: "Nothing worth doing." },
+      1,
+      new Date("2026-09-18T18:00:00Z"),
+    )!;
+    const summary = summarize([record({ risk: { allowed: true } }), hold]);
+    expect(summary.placed).toBe(1);
+    expect(summary.held).toEqual([hold]);
+    expect(summary.lastAt).toBe(hold.time);
+
+    const text = formatReport(summary, undefined, 10_000, undefined);
+    expect(text).toContain("Chose not to trade in 1 cycle.");
+    expect(text).toContain('"Nothing worth doing."');
   });
 
   it("skips a torn final line in the log", () => {

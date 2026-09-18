@@ -20,7 +20,7 @@ When you place or close a position, the reason you give is stored permanently an
 
 Your account has risk limits enforced outside you. You can read them with get_limits and you cannot change them. If an order is refused, read the reason and decide what to do next rather than resubmitting the same order.
 
-Keep your written replies brief: a sentence or two on what you decided and why.`;
+Keep your written replies brief: a sentence or two on what you decided and why. If you decide to do nothing, end your final reply with one line starting "Held because:" and, in one or two plain sentences, the specific observation that made waiting the right call. That line is stored as the reason, the same way a trade's reason is.`;
 
 export interface ToolCallOutcome {
   text: string;
@@ -55,8 +55,15 @@ export interface CycleOutcome {
   modelCalls: number;
   toolCalls: number;
   refusedByLimits: number;
+  /** Calls to tools that trade: place_order, close_position, cancel_order. */
+  actionsAttempted: number;
+  /** What the agent wrote in the response that ended the cycle. */
+  finalText: string;
   costUsd: number;
 }
+
+/** The tools that write their own record to the decision log. */
+export const ACTION_TOOLS: ReadonlySet<string> = new Set(["place_order", "close_position", "cancel_order"]);
 
 const DEFAULT_MAX_STEPS = 12;
 
@@ -120,6 +127,8 @@ export async function runCycle(deps: CycleDeps, cycleNumber: number): Promise<Cy
     modelCalls: 0,
     toolCalls: 0,
     refusedByLimits: 0,
+    actionsAttempted: 0,
+    finalText: "",
     costUsd: 0,
   };
 
@@ -133,9 +142,12 @@ export async function runCycle(deps: CycleDeps, cycleNumber: number): Promise<Cy
     outcome.modelCalls++;
     outcome.costUsd += await deps.spend.record(deps.model, response.usage);
 
+    const texts: string[] = [];
     for (const block of response.content) {
-      if (block.type === "text" && block.text.trim()) deps.print(`  ${block.text.trim()}`);
+      if (block.type === "text" && block.text.trim()) texts.push(block.text.trim());
     }
+    for (const text of texts) deps.print(`  ${text}`);
+    outcome.finalText = texts.join("\n");
 
     if (response.stop_reason === "refusal") {
       deps.print("  (the model declined this turn; ending the cycle)");
@@ -171,6 +183,7 @@ export async function runCycle(deps: CycleDeps, cycleNumber: number): Promise<Cy
       deps.print(`  → ${toolUse.name} ${describeArgs(args)}`);
       const result = await deps.callTool(toolUse.name, args);
       outcome.toolCalls++;
+      if (ACTION_TOOLS.has(toolUse.name)) outcome.actionsAttempted++;
       if (result.isError && result.text.startsWith("BLOCKED")) outcome.refusedByLimits++;
       deps.print(`    ${result.isError ? "✗" : "←"} ${preview(result.text)}`);
       results.push({

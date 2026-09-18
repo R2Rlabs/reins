@@ -17,7 +17,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 207 tests, no network calls in any of them.
+Early, but real. 223 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|

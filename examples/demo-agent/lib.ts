@@ -1,8 +1,9 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
-import type { DecisionRecord } from "../../src/decision-log.js";
+import type { DecisionContext, DecisionRecord } from "../../src/decision-log.js";
 import type { PaperState } from "../../src/paper.js";
+import type { CycleOutcome } from "./cycle.ts";
 
 // --- pricing ---------------------------------------------------------------
 
@@ -207,6 +208,107 @@ export function buildServerEnv(
   return env;
 }
 
+// --- holds -----------------------------------------------------------------
+
+/**
+ * A cycle in which the agent chose not to trade.
+ *
+ * Reins only logs actions, so without this a cycle spent waiting leaves no
+ * trace, and a sensible agent that mostly waits would publish a log that looks
+ * like it did nothing. It goes in the same file as the actions, so the agent
+ * reads its own earlier holds back through get_recent_decisions, and it has
+ * the same shape: `reason` is the agent's final reply, testimony like any
+ * other reason in the log.
+ */
+export interface HoldRecord {
+  id: string;
+  time: string;
+  tool: "hold";
+  reason: string;
+  request: { cycle: number };
+  context?: DecisionContext;
+}
+
+export type LogRecord = DecisionRecord | HoldRecord;
+
+const HELD_BECAUSE = /^[\s*_#>-]*held because[\s*_]*:[\s*_]*/im;
+
+/**
+ * The reason to store for a hold: the "Held because:" line the system prompt
+ * asks for, or the whole reply when the agent did not write one. Only the last
+ * such line counts, and markdown emphasis around it is dropped, since the log
+ * is read as plain text.
+ */
+export function holdReason(finalText: string): string {
+  const lines = finalText.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]!;
+    if (!HELD_BECAUSE.test(line)) continue;
+    const reason = [line.replace(HELD_BECAUSE, ""), ...lines.slice(i + 1)]
+      .join(" ")
+      .replace(/\*\*|__/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (reason) return reason;
+  }
+  return finalText.trim();
+}
+
+/**
+ * The hold record for a finished cycle, or undefined when there should not be
+ * one: the agent traded (its actions are already logged), or the cycle ended
+ * for some reason other than the agent deciding it was done.
+ */
+export function holdRecord(
+  outcome: Pick<CycleOutcome, "stoppedBecause" | "actionsAttempted" | "finalText">,
+  cycle: number,
+  time: Date,
+  context?: DecisionContext,
+): HoldRecord | undefined {
+  if (outcome.stoppedBecause !== "end_turn" || outcome.actionsAttempted > 0) return undefined;
+  const iso = time.toISOString();
+  return {
+    id: `${iso}#hold`,
+    time: iso,
+    tool: "hold",
+    reason: holdReason(outcome.finalText) || "(the agent ended the cycle without saying why)",
+    request: { cycle },
+    ...(context ? { context } : {}),
+  };
+}
+
+/** Account state from a get_positions result, or undefined if it is not one. */
+export function contextFromPositions(text: string): DecisionContext | undefined {
+  try {
+    const parsed = JSON.parse(text) as Partial<DecisionContext>;
+    if (
+      typeof parsed.accountValueUsd !== "number" ||
+      typeof parsed.realizedPnlTodayUsd !== "number" ||
+      typeof parsed.positionsUsd !== "object" ||
+      parsed.positionsUsd === null
+    ) {
+      return undefined;
+    }
+    return {
+      accountValueUsd: parsed.accountValueUsd,
+      realizedPnlTodayUsd: parsed.realizedPnlTodayUsd,
+      positionsUsd: parsed.positionsUsd,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Appends one line to the decision log. The server writes the same file, but
+ * only while a tool call is in flight, and this runs after the cycle's last
+ * one has returned, so the two never write at once.
+ */
+export async function appendToLog(path: string, record: LogRecord): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await appendFile(path, `${JSON.stringify(record)}\n`, "utf8");
+}
+
 // --- reporting -------------------------------------------------------------
 
 export interface DemoSummary {
@@ -214,23 +316,29 @@ export interface DemoSummary {
   placed: number;
   filled: number;
   refusedByLimits: DecisionRecord[];
+  held: HoldRecord[];
   rejectedByExchange: number;
   errors: number;
   firstAt?: string;
   lastAt?: string;
 }
 
-export function summarize(records: DecisionRecord[]): DemoSummary {
+export function summarize(records: LogRecord[]): DemoSummary {
   const ordered = [...records].sort((a, b) => a.time.localeCompare(b.time));
   const summary: DemoSummary = {
     decisions: ordered.length,
     placed: 0,
     filled: 0,
     refusedByLimits: [],
+    held: [],
     rejectedByExchange: 0,
     errors: 0,
   };
   for (const record of ordered) {
+    if (record.tool === "hold") {
+      summary.held.push(record);
+      continue;
+    }
     if (record.risk && !record.risk.allowed) {
       summary.refusedByLimits.push(record);
       continue;
@@ -251,13 +359,13 @@ export function summarize(records: DecisionRecord[]): DemoSummary {
   return summary;
 }
 
-export function parseDecisionLog(raw: string): DecisionRecord[] {
-  const records: DecisionRecord[] = [];
+export function parseDecisionLog(raw: string): LogRecord[] {
+  const records: LogRecord[] = [];
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      records.push(JSON.parse(trimmed) as DecisionRecord);
+      records.push(JSON.parse(trimmed) as LogRecord);
     } catch {
       // A torn final line should not hide everything before it.
     }
@@ -305,6 +413,16 @@ export function formatReport(
       `${summary.refusedByLimits.length} refused by the limits, ` +
       `${summary.rejectedByExchange} rejected by the market`,
   );
+
+  const lastHold = summary.held.at(-1);
+  if (lastHold) {
+    const n = summary.held.length;
+    lines.push(
+      "",
+      `Chose not to trade in ${n} cycle${n === 1 ? "" : "s"}. The most recent, in the agent's own words:`,
+      `  ${lastHold.time.slice(0, 16)}  "${lastHold.reason}"`,
+    );
+  }
 
   if (summary.refusedByLimits.length > 0) {
     lines.push("", "Refused by the limits, in the agent's own words:");

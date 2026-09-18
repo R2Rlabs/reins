@@ -18,7 +18,10 @@ import { Client } from "@modelcontextprotocol/client";
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { runCycle, type CycleDeps } from "./cycle.ts";
 import {
+  appendToLog,
   buildServerEnv,
+  contextFromPositions,
+  holdRecord,
   DEMO_MODELS,
   EFFORTS,
   mcpToolsToClaude,
@@ -179,6 +182,18 @@ async function main(): Promise<void> {
       console.log(`[${new Date().toISOString().slice(0, 19)}Z] cycle ${cycle}`);
       try {
         const outcome = await runCycle(deps, cycle);
+        const hold = holdRecord(outcome, cycle, new Date());
+        if (hold) {
+          try {
+            const positions = await deps.callTool("get_positions", {});
+            const context = positions.isError ? undefined : contextFromPositions(positions.text);
+            await appendToLog(logFile, context ? { ...hold, context } : hold);
+            console.log("  no trade this cycle; the decision to hold is in the log");
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.log(`  could not record the hold: ${message}`);
+          }
+        }
         const costLine = values.scripted
           ? ""
           : ` · $${outcome.costUsd.toFixed(3)} this cycle, $${spend.remainingUsd.toFixed(2)} left`;
