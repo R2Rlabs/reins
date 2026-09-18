@@ -4,6 +4,8 @@ import type { MarketDataSource, TradingClient } from "./trading-client.js";
 import type {
   BookLevel,
   CancelOutcome,
+  Candle,
+  CandleInterval,
   L2Book,
   OrderOutcome,
   Tif,
@@ -232,6 +234,16 @@ export class PaperClient implements TradingClient {
 
   async l2Book(coin: string): Promise<L2Book> {
     return this.market.l2Book(coin);
+  }
+
+  /** Real candles: price history is market data, so paper has nothing to simulate. */
+  async candles(
+    coin: string,
+    interval: CandleInterval,
+    startTime: number,
+    endTime: number,
+  ): Promise<Candle[]> {
+    return this.market.candles(coin, interval, startTime, endTime);
   }
 
   accountState(): Promise<AccountState> {

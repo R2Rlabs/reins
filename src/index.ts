@@ -29,11 +29,14 @@ export {
   getLimits,
   getPositions,
   getBook,
+  getCandles,
+  AGENT_CANDLE_INTERVALS,
   placeOrder,
   cancelOrder,
   closePosition,
   getRecentDecisions,
   TOOL_NAMES,
+  type AgentCandleInterval,
   type McpServerDeps,
   type PlaceOrderArgs,
   type ToolResult,
@@ -84,6 +87,8 @@ export { MockTransport, routeKeyFor, type MockRouteKey, type RecordedCall } from
 
 export type {
   AssetMeta,
+  Candle,
+  CandleInterval,
   CancelOutcome,
   ClearinghouseState,
   Meta,
@@ -93,4 +98,4 @@ export type {
   Signature,
   Tif,
 } from "./types.js";
-export { API_URLS } from "./types.js";
+export { API_URLS, CANDLE_INTERVALS } from "./types.js";

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { HyperliquidClient } from "./client.js";
+import { MemoryDecisionLog } from "./decision-log.js";
 import { MockTransport } from "./mock-transport.js";
 import {
   closePosition,
   createMcpServer,
   getBook,
+  getCandles,
   getLimits,
   getPositions,
   marketablePrice,
@@ -203,6 +205,95 @@ describe("get_book", () => {
     const { deps } = setup();
     const body = parse(await getBook(deps, { symbol: "BTC", depth: 1 }));
     expect(body["bids"]).toHaveLength(1);
+  });
+});
+
+describe("get_candles", () => {
+  const HOUR = 3_600_000;
+  const now = Date.UTC(2026, 8, 18, 17, 57);
+  const hourStart = Date.UTC(2026, 8, 18, 17);
+
+  function candle(openTime: number, close: number) {
+    return {
+      t: openTime,
+      T: openTime + HOUR - 1,
+      s: "BTC",
+      i: "1h",
+      o: "80000.0",
+      c: `${close}.0`,
+      h: "81000.0",
+      l: "79500.0",
+      v: "12.5",
+      n: 40,
+    };
+  }
+
+  function candleSetup(candles: unknown[]) {
+    const { transport, deps } = setup();
+    transport.reply("info:candleSnapshot", candles);
+    return { transport, deps: { ...deps, now: () => now } };
+  }
+
+  it("returns numbers, oldest first, and flags the forming candle", async () => {
+    const { deps } = candleSetup([candle(hourStart - HOUR, 80_100), candle(hourStart, 80_200)]);
+    const body = parse(await getCandles(deps, { symbol: "BTC", count: 2 }));
+
+    expect(body["interval"]).toBe("1h");
+    expect(body["candles"]).toEqual([
+      { time: "2026-09-18T16:00:00.000Z", open: 80_000, high: 81_000, low: 79_500, close: 80_100, volume: 12.5 },
+      { time: "2026-09-18T17:00:00.000Z", open: 80_000, high: 81_000, low: 79_500, close: 80_200, volume: 12.5 },
+    ]);
+    expect(body["lastCandleComplete"]).toBe(false);
+  });
+
+  it("says the last candle is complete once its close time has passed", async () => {
+    const { deps } = candleSetup([candle(hourStart - HOUR, 80_100)]);
+    const body = parse(await getCandles(deps, { symbol: "BTC", count: 1 }));
+    expect(body["lastCandleComplete"]).toBe(true);
+  });
+
+  it("asks for a window just wide enough and keeps only the newest count", async () => {
+    const { transport, deps } = candleSetup([
+      candle(hourStart - 2 * HOUR, 1),
+      candle(hourStart - HOUR, 2),
+      candle(hourStart, 3),
+    ]);
+    const body = parse(await getCandles(deps, { symbol: "BTC", interval: "1h", count: 2 }));
+
+    expect((body["candles"] as { close: number }[]).map((c) => c.close)).toEqual([2, 3]);
+    expect(transport.callsTo("info:candleSnapshot")[0]?.body["req"]).toEqual({
+      coin: "BTC",
+      interval: "1h",
+      startTime: now - 2 * HOUR,
+      endTime: now,
+    });
+  });
+
+  it("defaults to 24 hourly candles", async () => {
+    const { transport, deps } = candleSetup([]);
+    const body = parse(await getCandles(deps, { symbol: "ETH" }));
+    const req = transport.callsTo("info:candleSnapshot")[0]?.body["req"] as { startTime: number };
+
+    expect(req.startTime).toBe(now - 24 * HOUR);
+    expect(body["candles"]).toEqual([]);
+    expect(body).not.toHaveProperty("lastCandleComplete");
+  });
+
+  it("reports an unknown symbol as a tool error", async () => {
+    const { transport, deps } = setup();
+    transport.reply("info:candleSnapshot", null);
+    const result = await getCandles(deps, { symbol: "NOPE" });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toMatch(/not a listed market/);
+  });
+
+  it("never touches the decision log or the rate limit", async () => {
+    const { deps } = candleSetup([]);
+    const log = new MemoryDecisionLog();
+    const before = deps.engine.ordersRemaining();
+    await getCandles({ ...deps, log }, { symbol: "BTC" });
+    expect(deps.engine.ordersRemaining()).toBe(before);
+    expect(log.records).toEqual([]);
   });
 });
 

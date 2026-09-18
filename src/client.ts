@@ -5,6 +5,8 @@ import {
   API_URLS,
   type AssetMeta,
   type CancelAction,
+  type Candle,
+  type CandleInterval,
   type CancelOutcome,
   type ClearinghouseState,
   type ExchangeRequest,
@@ -83,10 +85,13 @@ export class ReadOnlyClientError extends Error {
 
 export class HyperliquidApiError extends Error {
   readonly status: number;
-  constructor(message: string, status: number) {
+  /** The raw response body, when there was one. */
+  readonly body: string | undefined;
+  constructor(message: string, status: number, body?: string) {
     super(message);
     this.name = "HyperliquidApiError";
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -189,6 +194,38 @@ export class HyperliquidClient {
 
   async l2Book(coin: string): Promise<L2Book> {
     return this.postInfo<L2Book>({ type: "l2Book", coin });
+  }
+
+  /**
+   * Candles whose open time falls in [startTime, endTime], oldest first. Only
+   * the most recent 5000 candles of any interval are available.
+   *
+   * The API answers an unknown coin with a body of `null` — as HTTP 500 on
+   * mainnet when this was written, so both that and a 200 are handled — which
+   * becomes an error that says what actually went wrong.
+   */
+  async candles(
+    coin: string,
+    interval: CandleInterval,
+    startTime: number,
+    endTime: number,
+  ): Promise<Candle[]> {
+    const unknownCoin = (status: number) =>
+      new HyperliquidApiError(`No candles for "${coin}" — it is not a listed market.`, status, "null");
+    let candles: Candle[] | null;
+    try {
+      candles = await this.postInfo<Candle[] | null>({
+        type: "candleSnapshot",
+        req: { coin, interval, startTime, endTime },
+      });
+    } catch (error) {
+      if (error instanceof HyperliquidApiError && error.body?.trim() === "null") {
+        throw unknownCoin(error.status);
+      }
+      throw error;
+    }
+    if (candles === null) throw unknownCoin(200);
+    return candles;
   }
 
   async userFills(user?: string): Promise<Fill[]> {
@@ -324,6 +361,7 @@ export class HyperliquidClient {
       throw new HyperliquidApiError(
         `${path} returned ${response.status}: ${text.slice(0, 300)}`,
         response.status,
+        text,
       );
     }
     try {
@@ -332,6 +370,7 @@ export class HyperliquidClient {
       throw new HyperliquidApiError(
         `${path} returned a non-JSON body: ${text.slice(0, 300)}`,
         response.status,
+        text,
       );
     }
   }

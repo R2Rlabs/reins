@@ -212,6 +212,64 @@ export function getBook(
   });
 }
 
+/**
+ * The intervals the agent is offered: minutes to days, without the long tail
+ * the API also accepts.
+ */
+export const AGENT_CANDLE_INTERVALS = ["1m", "5m", "15m", "1h", "4h", "1d"] as const;
+export type AgentCandleInterval = (typeof AGENT_CANDLE_INTERVALS)[number];
+
+const MINUTE = 60_000;
+const INTERVAL_MS: Record<AgentCandleInterval, number> = {
+  "1m": MINUTE,
+  "5m": 5 * MINUTE,
+  "15m": 15 * MINUTE,
+  "1h": 60 * MINUTE,
+  "4h": 240 * MINUTE,
+  "1d": 1_440 * MINUTE,
+};
+
+/**
+ * The most recent `count` candles, oldest first. The newest is usually still
+ * forming, and says so: a half-built candle read as a finished one looks like
+ * a sharp move that has not happened.
+ */
+export function getCandles(
+  deps: McpServerDeps,
+  args: {
+    symbol: string;
+    interval?: AgentCandleInterval | undefined;
+    count?: number | undefined;
+  },
+): Promise<ToolResult> {
+  return guard(async () => {
+    const interval = args.interval ?? "1h";
+    const count = args.count ?? 24;
+    const now = (deps.now ?? Date.now)();
+    const raw = await deps.client.candles(
+      args.symbol,
+      interval,
+      now - count * INTERVAL_MS[interval],
+      now,
+    );
+    const candles = raw.slice(-count);
+    const last = candles.at(-1);
+    return ok({
+      symbol: args.symbol,
+      interval,
+      candles: candles.map((c) => ({
+        time: new Date(c.t).toISOString(),
+        open: Number(c.o),
+        high: Number(c.h),
+        low: Number(c.l),
+        close: Number(c.c),
+        volume: Number(c.v),
+      })),
+      lastCandleComplete: last ? last.T < now : undefined,
+    });
+  });
+}
+
 export interface PlaceOrderArgs {
   symbol: string;
   side: "buy" | "sell";
@@ -387,6 +445,7 @@ export const TOOL_NAMES = [
   "get_limits",
   "get_positions",
   "get_book",
+  "get_candles",
   "place_order",
   "cancel_order",
   "close_position",
@@ -439,6 +498,32 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
       }),
     },
     (args) => getBook(deps, args),
+  );
+
+  server.registerTool(
+    "get_candles",
+    {
+      title: "Get price candles",
+      description:
+        "Recent price history for a symbol as candles, oldest first: open, high, " +
+        "low, close and volume for each interval. The newest candle is usually " +
+        "still forming — lastCandleComplete says whether it has closed.",
+      inputSchema: z.object({
+        symbol: z.string().describe("Perp symbol, for example BTC or ETH."),
+        interval: z
+          .enum(AGENT_CANDLE_INTERVALS)
+          .optional()
+          .describe("Length of each candle. Defaults to 1h."),
+        count: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .optional()
+          .describe("How many of the most recent candles to return. Defaults to 24."),
+      }),
+    },
+    (args) => getCandles(deps, args),
   );
 
   server.registerTool(

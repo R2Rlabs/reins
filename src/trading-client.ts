@@ -1,6 +1,13 @@
 import type { PlaceOrderParams } from "./client.js";
 import type { AccountState } from "./risk.js";
-import type { AssetMeta, CancelOutcome, L2Book, OrderOutcome } from "./types.js";
+import type {
+  AssetMeta,
+  CancelOutcome,
+  Candle,
+  CandleInterval,
+  L2Book,
+  OrderOutcome,
+} from "./types.js";
 
 /**
  * What the MCP server needs from whatever is executing orders.
@@ -12,12 +19,27 @@ import type { AssetMeta, CancelOutcome, L2Book, OrderOutcome } from "./types.js"
 export interface TradingClient {
   accountState(): Promise<AccountState>;
   l2Book(coin: string): Promise<L2Book>;
+  candles(
+    coin: string,
+    interval: CandleInterval,
+    startTime: number,
+    endTime: number,
+  ): Promise<Candle[]>;
   placeOrder(params: PlaceOrderParams): Promise<OrderOutcome>;
   cancelOrder(symbol: string, oid: number): Promise<CancelOutcome>;
 }
 
-/** The live market data a paper account needs to price its simulated fills. */
+/**
+ * The live market data a paper account needs: books to price its simulated
+ * fills, and candles to pass straight through to the agent.
+ */
 export interface MarketDataSource {
   l2Book(coin: string): Promise<L2Book>;
+  candles(
+    coin: string,
+    interval: CandleInterval,
+    startTime: number,
+    endTime: number,
+  ): Promise<Candle[]>;
   assetInfo(symbol: string): Promise<AssetMeta & { index: number }>;
 }

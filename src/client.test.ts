@@ -339,6 +339,57 @@ describe("account state", () => {
   });
 });
 
+describe("candles", () => {
+  // The shape candleSnapshot returned for BTC on mainnet, 2026-09-18.
+  const CANDLE = {
+    t: 1_789_750_800_000,
+    T: 1_789_754_399_999,
+    s: "BTC",
+    i: "1h",
+    o: "80877.0",
+    c: "80928.0",
+    h: "80967.0",
+    l: "80594.0",
+    v: "1345.18082",
+    n: 17078,
+  };
+
+  it("asks candleSnapshot for the coin, interval and window", async () => {
+    transport.reply("info:candleSnapshot", [CANDLE]);
+    const candles = await client().candles("BTC", "1h", 1_000, 2_000);
+
+    expect(candles).toEqual([CANDLE]);
+    expect(transport.callsTo("info:candleSnapshot")[0]?.body).toEqual({
+      type: "candleSnapshot",
+      req: { coin: "BTC", interval: "1h", startTime: 1_000, endTime: 2_000 },
+    });
+  });
+
+  it("works without a signer, since it is market data", async () => {
+    transport.reply("info:candleSnapshot", []);
+    const readOnly = new HyperliquidClient({ fetch: transport.fetch });
+    await expect(readOnly.candles("ETH", "1d", 0, 1)).resolves.toEqual([]);
+  });
+
+  it("explains the 500 with a null body that mainnet sends for an unknown coin", async () => {
+    transport.failRoute("info:candleSnapshot", 500, "null");
+    const error = await client().candles("NOPE", "1h", 0, 1).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(HyperliquidApiError);
+    expect((error as HyperliquidApiError).message).toMatch(/"NOPE" — it is not a listed market/);
+    expect((error as HyperliquidApiError).status).toBe(500);
+  });
+
+  it("handles a null sent with a 200 the same way", async () => {
+    transport.reply("info:candleSnapshot", null);
+    await expect(client().candles("NOPE", "1h", 0, 1)).rejects.toThrow(/not a listed market/);
+  });
+
+  it("passes any other failure through unchanged", async () => {
+    transport.failRoute("info:candleSnapshot", 422, "Failed to deserialize the JSON body");
+    await expect(client().candles("BTC", "1h", 0, 1)).rejects.toThrow(/422: Failed to deserialize/);
+  });
+});
+
 describe("transport errors", () => {
   it("wraps a non-2xx response", async () => {
     transport.failWith(503, "upstream unavailable");

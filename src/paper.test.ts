@@ -9,7 +9,7 @@ import {
   type PaperPosition,
 } from "./paper.js";
 import type { MarketDataSource } from "./trading-client.js";
-import type { BookLevel, L2Book } from "./types.js";
+import type { BookLevel, Candle, CandleInterval, L2Book } from "./types.js";
 
 function book(bids: [number, number][], asks: [number, number][]): L2Book {
   const level = ([px, sz]: [number, number]): BookLevel => ({
@@ -43,6 +43,11 @@ class FakeMarket implements MarketDataSource {
   async l2Book(): Promise<L2Book> {
     return this.current;
   }
+  candleRequests: unknown[][] = [];
+  async candles(...args: [string, CandleInterval, number, number]): Promise<Candle[]> {
+    this.candleRequests.push(args);
+    return [];
+  }
   async assetInfo(symbol: string) {
     return { name: symbol, szDecimals: this.szDecimals, maxLeverage: 50, index: 0 };
   }
@@ -61,6 +66,13 @@ function client(overrides: Partial<ConstructorParameters<typeof PaperClient>[0]>
     ...overrides,
   });
 }
+
+describe("candles", () => {
+  it("passes straight through to the live market", async () => {
+    await client().candles("ETH", "15m", 10, 20);
+    expect(market.candleRequests).toEqual([["ETH", "15m", 10, 20]]);
+  });
+});
 
 describe("applyToPosition", () => {
   it("opens from flat at the fill price", () => {

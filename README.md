@@ -17,12 +17,12 @@ this repo is.
 
 ## Status
 
-Early, but real. 223 tests, no network calls in any of them.
+Early, but real. 237 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
 | `src/risk.ts` | The risk engine — position cap, leverage cap, daily loss halt, allowlist, rate limit |
-| `src/client.ts` | Hyperliquid REST client — orders, cancels, book, fills, account state, builder code |
+| `src/client.ts` | Hyperliquid REST client — orders, cancels, book, candles, fills, account state, builder code |
 | `src/mcp-server.ts` | The agent-facing tools, each risk-checked and logged before anything is sent |
 | `src/paper.ts` | Paper trading — live prices, simulated fills. See below |
 | `src/paper-store.ts` | Persists a paper run across restarts |
@@ -160,7 +160,7 @@ behind.
 
 ## The MCP server
 
-Seven tools. Every one that can move money passes the risk engine first, and
+Eight tools. Every one that can move money passes the risk engine first, and
 every attempt is written to the decision log.
 
 | Tool | Notes |
@@ -168,6 +168,7 @@ every attempt is written to the decision log.
 | `get_limits` | Limits, headroom per symbol, remaining loss budget, halted state |
 | `get_positions` | Signed notional per symbol, account value, today's realised PnL |
 | `get_book` | Best bid/ask, spread, nearest levels |
+| `get_candles` | Price history in 1m to 1d candles; the newest says whether it is still forming |
 | `place_order` | **Sized in USD**, not asset units — the same unit as the limits |
 | `cancel_order` | By exchange order id |
 | `close_position` | Reduce-only, crosses the spread, works even when halted |
