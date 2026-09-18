@@ -179,17 +179,159 @@ export function getLimits(deps: McpServerDeps): Promise<ToolResult> {
   });
 }
 
+/**
+ * Which positions have a stop-loss, and which do not. A position counts as
+ * protected only when its stops cover all of it: a stop sized for a position
+ * that has since grown leaves the rest exposed.
+ */
+async function protection(deps: McpServerDeps) {
+  const [positions, stops] = await Promise.all([
+    deps.client.openPositions(),
+    deps.client.stopLosses(),
+  ]);
+  const unprotected: string[] = [];
+  for (const [symbol, { size }] of Object.entries(positions)) {
+    const closing = size > 0 ? "sell" : "buy";
+    const covered = stops
+      .filter((stop) => stop.symbol === symbol && stop.side === closing)
+      .reduce((sum, stop) => sum + stop.size, 0);
+    if (covered < Math.abs(size) * 0.999) unprotected.push(symbol);
+  }
+  return { positions, stops, unprotected };
+}
+
+/** Account state plus what the stop-loss rule needs to see. */
+async function stateForRisk(deps: McpServerDeps): Promise<AccountState> {
+  const state = await deps.client.accountState();
+  if (!deps.engine.configuredLimits.requireStopLoss) return state;
+  const { unprotected } = await protection(deps);
+  return { ...state, unprotectedSymbols: unprotected };
+}
+
 export function getPositions(deps: McpServerDeps): Promise<ToolResult> {
   return guard(async () => {
     const state = await deps.client.accountState();
+    const { stops, unprotected } = await protection(deps);
     return ok({
       positionsUsd: Object.fromEntries(
         Object.entries(state.positionsUsd).map(([k, v]) => [k, round(v)]),
       ),
       accountValueUsd: round(state.accountValueUsd),
       realizedPnlTodayUsd: round(state.realizedPnlTodayUsd),
+      stopLosses: stops.map((stop) => ({
+        orderId: stop.oid,
+        symbol: stop.symbol,
+        side: stop.side,
+        size: stop.size,
+        triggerPrice: stop.triggerPrice,
+      })),
+      unprotected,
     });
   });
+}
+
+/**
+ * Put a stop-loss under the whole of a symbol's position, replacing any stop
+ * already there. The new stop goes on before the old ones come off, so the
+ * position is never left bare in between. Shared by set_stop_loss and by
+ * place_order's stopLoss, which skips the rate limit: its entry already
+ * passed it, and a filled position left without its stop is the worse outcome.
+ */
+async function placeProtectiveStop(
+  deps: McpServerDeps,
+  args: { symbol: string; triggerPrice: number; reason: string },
+  options: { checkRisk: boolean },
+): Promise<ToolResult> {
+  const { positions, stops } = await protection(deps);
+  const held = positions[args.symbol]?.size ?? 0;
+  if (held === 0) return fail(`No open ${args.symbol} position to protect.`);
+  const side = held > 0 ? "sell" : "buy";
+
+  const book = await deps.client.l2Book(args.symbol);
+  const touch = side === "sell" ? bestBid(book) : bestAsk(book);
+  const wrongSide =
+    touch !== undefined &&
+    (side === "sell" ? args.triggerPrice >= touch : args.triggerPrice <= touch);
+  if (wrongSide) {
+    return fail(
+      `A stop at ${args.triggerPrice} would trigger at once: the ${side === "sell" ? "bid" : "ask"} ` +
+        `is ${touch}. A stop on a ${held > 0 ? "long" : "short"} goes ` +
+        `${held > 0 ? "below" : "above"} the market. To exit now, use close_position.`,
+    );
+  }
+
+  const state = await deps.client.accountState();
+  const replaced = stops.filter((stop) => stop.symbol === args.symbol).map((stop) => stop.oid);
+  const record = startRecord(deps, "set_stop_loss", args.reason, {
+    symbol: args.symbol,
+    side,
+    size: Math.abs(held),
+    triggerPrice: args.triggerPrice,
+    replaces: replaced,
+  });
+  record.context = contextOf(state);
+
+  if (options.checkRisk) {
+    const decision = deps.engine.check(
+      {
+        symbol: args.symbol,
+        side,
+        sizeUsd: Math.abs(state.positionsUsd[args.symbol] ?? held * args.triggerPrice),
+        reduceOnly: true,
+      },
+      state,
+    );
+    record.risk = riskOf(decision);
+    if (!decision.allowed) return blocked(decision, await recordSafely(deps, record));
+  }
+
+  let outcome;
+  try {
+    outcome = await deps.client.placeStopLoss({
+      symbol: args.symbol,
+      side,
+      size: Math.abs(held),
+      triggerPrice: args.triggerPrice,
+    });
+  } catch (error) {
+    record.error = error instanceof Error ? error.message : String(error);
+    await recordSafely(deps, record);
+    throw error;
+  }
+  deps.engine.recordOrder();
+  record.outcome = outcome;
+
+  if (outcome.kind !== "resting") {
+    const warning = await recordSafely(deps, record);
+    const message = outcome.kind === "rejected" ? outcome.message : `unexpected ${outcome.kind}`;
+    return fail(
+      `Exchange rejected the stop: ${message}` + (warning ? `\n[decision log: ${warning}]` : ""),
+    );
+  }
+
+  const notCancelled: number[] = [];
+  for (const oid of replaced) {
+    const cancelled = await deps.client.cancelOrder(args.symbol, oid);
+    if (cancelled.kind !== "cancelled") notCancelled.push(oid);
+  }
+  const warning = await recordSafely(deps, record);
+  return ok(
+    {
+      stopLoss: { orderId: outcome.oid, symbol: args.symbol, side, size: Math.abs(held), triggerPrice: args.triggerPrice },
+      replaced: replaced.filter((oid) => !notCancelled.includes(oid)),
+      ...(notCancelled.length > 0
+        ? { warning: `Could not cancel the old stop(s) ${notCancelled.join(", ")}; cancel them with cancel_order.` }
+        : {}),
+    },
+    warning,
+  );
+}
+
+export function setStopLoss(
+  deps: McpServerDeps,
+  args: { symbol: string; triggerPrice: number; reason: string },
+): Promise<ToolResult> {
+  return guard(() => placeProtectiveStop(deps, args, { checkRisk: true }));
 }
 
 export function getBook(
@@ -278,6 +420,8 @@ export interface PlaceOrderArgs {
   price?: number | undefined;
   reduceOnly?: boolean | undefined;
   tif?: "Gtc" | "Ioc" | "Alo" | undefined;
+  /** Trigger price of a stop-loss to put under the position once this fills. */
+  stopLoss?: number | undefined;
 }
 
 export function placeOrder(
@@ -287,15 +431,40 @@ export function placeOrder(
   return guard(async () => {
     const explicitPrice = args.price;
     const marketable = explicitPrice === undefined;
+
+    // Checked before anything is sent, so a bad stop never leaves a filled
+    // entry behind it.
+    if (args.stopLoss !== undefined) {
+      if (args.reduceOnly) return fail("A reduce-only order closes risk; it takes no stopLoss.");
+      if (!marketable) {
+        return fail(
+          "stopLoss goes on an order that fills now (no price). For a resting order, " +
+            "call set_stop_loss once it has filled.",
+        );
+      }
+    }
+
     const limitPrice =
       explicitPrice ??
       marketablePrice(await deps.client.l2Book(args.symbol), args.side, buffer(deps));
 
-    const state = await deps.client.accountState();
+    if (args.stopLoss !== undefined) {
+      const wrongSide = args.side === "buy" ? args.stopLoss >= limitPrice : args.stopLoss <= limitPrice;
+      if (wrongSide) {
+        return fail(
+          `A stopLoss for a ${args.side} goes ${args.side === "buy" ? "below" : "above"} ` +
+            `the entry (${round(limitPrice, 6)}), got ${args.stopLoss}.`,
+        );
+      }
+    }
+
+    const state = await stateForRisk(deps);
     const request: OrderRequest = {
       symbol: args.symbol,
       side: args.side,
       sizeUsd: args.sizeUsd,
+      marketable,
+      hasStopLoss: args.stopLoss !== undefined,
     };
     if (args.reduceOnly !== undefined) request.reduceOnly = args.reduceOnly;
 
@@ -310,6 +479,7 @@ export function placeOrder(
       marketable,
       reduceOnly: args.reduceOnly ?? false,
       tif,
+      ...(args.stopLoss !== undefined ? { stopLoss: args.stopLoss } : {}),
     });
     record.context = contextOf(state);
 
@@ -340,12 +510,39 @@ export function placeOrder(
     record.outcome = outcome;
     const warning = await recordSafely(deps, record);
 
-    return outcome.kind === "rejected"
-      ? fail(`Exchange rejected the order: ${outcome.message}`)
-      : ok(
-          { ...outcome, sizeUsd: args.sizeUsd, limitPrice: round(limitPrice, 6) },
-          warning,
-        );
+    if (outcome.kind === "rejected") return fail(`Exchange rejected the order: ${outcome.message}`);
+    const result = { ...outcome, sizeUsd: args.sizeUsd, limitPrice: round(limitPrice, 6) };
+    if (args.stopLoss === undefined || outcome.kind !== "filled") return ok(result, warning);
+
+    // The entry filled, so it stands whatever happens next. A stop that fails
+    // is reported loudly rather than turned into a failed order, which the
+    // agent would place again.
+    let stop: ToolResult;
+    try {
+      stop = await placeProtectiveStop(
+        deps,
+        {
+          symbol: args.symbol,
+          triggerPrice: args.stopLoss,
+          reason: `Stop for order ${outcome.oid}: ${args.reason}`,
+        },
+        { checkRisk: false },
+      );
+    } catch (error) {
+      stop = fail(error instanceof Error ? error.message : String(error));
+    }
+    const stopText = stop.content[0]?.type === "text" ? stop.content[0].text : "";
+    return ok(
+      stop.isError
+        ? {
+            ...result,
+            stopLossWarning:
+              `The order filled but its stop-loss was not placed: ${stopText} ` +
+              `The position is unprotected; call set_stop_loss.`,
+          }
+        : { ...result, stopLoss: (JSON.parse(stopText) as { stopLoss: unknown }).stopLoss },
+      warning,
+    );
   });
 }
 
@@ -425,9 +622,31 @@ export function closePosition(
     record.outcome = outcome;
     const warning = await recordSafely(deps, record);
 
-    return outcome.kind === "rejected"
-      ? fail(`Exchange rejected the close: ${outcome.message}`)
-      : ok({ closed: true, ...outcome, sizeUsd: round(sizeUsd) }, warning);
+    if (outcome.kind === "rejected") return fail(`Exchange rejected the close: ${outcome.message}`);
+
+    // A stop left behind a closed position would sit on the exchange with
+    // nothing to protect. Best effort: the close itself has already happened.
+    const cancelledStops: number[] = [];
+    try {
+      const { positions, stops } = await protection(deps);
+      if (!positions[args.symbol]) {
+        for (const stop of stops.filter((s) => s.symbol === args.symbol)) {
+          const cancelled = await deps.client.cancelOrder(args.symbol, stop.oid);
+          if (cancelled.kind === "cancelled") cancelledStops.push(stop.oid);
+        }
+      }
+    } catch {
+      // Reported by get_positions if it matters.
+    }
+    return ok(
+      {
+        closed: true,
+        ...outcome,
+        sizeUsd: round(sizeUsd),
+        ...(cancelledStops.length > 0 ? { cancelledStopLosses: cancelledStops } : {}),
+      },
+      warning,
+    );
   });
 }
 
@@ -452,6 +671,7 @@ export const TOOL_NAMES = [
   "get_book",
   "get_candles",
   "place_order",
+  "set_stop_loss",
   "cancel_order",
   "close_position",
   "get_recent_decisions",
@@ -567,9 +787,42 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
           .enum(["Gtc", "Ioc", "Alo"])
           .optional()
           .describe("Time in force. Defaults to Ioc when marketable, Gtc otherwise."),
+        stopLoss: z
+          .number()
+          .positive()
+          .optional()
+          .describe(
+            "Trigger price of a stop-loss to place under the whole position as soon as " +
+              "this order fills. Only for orders without a price, which fill now; below " +
+              "the entry for a buy, above it for a sell.",
+          ),
       }),
     },
     (args) => placeOrder(deps, args),
+  );
+
+  server.registerTool(
+    "set_stop_loss",
+    {
+      title: "Set a stop-loss",
+      description:
+        "Protect an open position with a stop-loss held on the exchange: once the price " +
+        "reaches triggerPrice, the whole position is closed at market, whether or not " +
+        "you are running at the time. Replaces any stop already on that symbol. Below " +
+        "the market for a long, above it for a short. Logged with your reason, like an order.",
+      inputSchema: z.object({
+        symbol: z.string().describe("Perp symbol with an open position, for example ETH."),
+        triggerPrice: z.number().positive().describe("Price at which the position is closed."),
+        reason: z
+          .string()
+          .min(1)
+          .describe(
+            "Why this level: what would have to happen for your view to be wrong, in one " +
+              "or two sentences. A human will read this later.",
+          ),
+      }),
+    },
+    (args) => setStopLoss(deps, args),
   );
 
   server.registerTool(

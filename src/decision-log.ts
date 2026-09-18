@@ -19,7 +19,7 @@ import type { CancelOutcome, OrderOutcome } from "./types.js";
  * testimony, useful for debugging and audit, not as proof of mechanism.
  */
 
-export type DecisionTool = "place_order" | "close_position" | "cancel_order";
+export type DecisionTool = "place_order" | "close_position" | "cancel_order" | "set_stop_loss";
 
 export interface DecisionContext {
   accountValueUsd: number;

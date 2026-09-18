@@ -47,7 +47,15 @@ function readLimits(): RiskLimits {
     dailyLossLimitUsd: num("REINS_DAILY_LOSS_USD"),
     symbolAllowlist: symbols,
     maxOrdersPerMinute: num("REINS_MAX_ORDERS_PER_MIN", 12),
+    requireStopLoss: flag("REINS_REQUIRE_STOP_LOSS"),
   };
+}
+
+function flag(name: string): boolean {
+  const raw = (process.env[name] ?? "").trim().toLowerCase();
+  if (raw === "" || raw === "false" || raw === "0") return false;
+  if (raw === "true" || raw === "1") return true;
+  throw new Error(`${name} must be true or false, got "${process.env[name]}".`);
 }
 
 function readBuilder(): BuilderConfig | undefined {
@@ -128,6 +136,7 @@ async function main(): Promise<void> {
       `  max position    $${limits.maxPositionUsd.toLocaleString()}\n` +
       `  daily loss      $${limits.dailyLossLimitUsd.toLocaleString()}\n` +
       `  max leverage    ${limits.maxLeverage}x\n` +
+      `  stop-losses     ${limits.requireStopLoss ? "required on every position" : "optional"}\n` +
       `  symbols         ${limits.symbolAllowlist.join(", ")}\n` +
       `  builder code    ${builder ? `${builder.feeTenthsBps / 10} bp` : "none"}\n` +
       `  decision log    ${logFile ?? "in memory (lost on restart)"}\n`,

@@ -7,6 +7,7 @@ import type {
   CandleInterval,
   L2Book,
   OrderOutcome,
+  StopLoss,
 } from "./types.js";
 
 /**
@@ -27,6 +28,16 @@ export interface TradingClient {
   ): Promise<Candle[]>;
   placeOrder(params: PlaceOrderParams): Promise<OrderOutcome>;
   cancelOrder(symbol: string, oid: number): Promise<CancelOutcome>;
+  /** A reduce-only stop-market order; cancelled with cancelOrder like any other. */
+  placeStopLoss(params: {
+    symbol: string;
+    side: "buy" | "sell";
+    size: number;
+    triggerPrice: number;
+  }): Promise<OrderOutcome>;
+  stopLosses(): Promise<StopLoss[]>;
+  /** Signed sizes in asset units. accountState only carries USD notional. */
+  openPositions(): Promise<Record<string, { size: number; entryPrice: number }>>;
 }
 
 /**

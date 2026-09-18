@@ -211,6 +211,7 @@ export interface DemoServerConfig {
   maxOrdersPerMin: number;
   paperBalanceUsd: number;
   builderFeeTenthsBps: number;
+  requireStopLoss: boolean;
   paperFile: string;
   logFile: string;
 }
@@ -247,6 +248,7 @@ export function buildServerEnv(
     // trades pay what a real user of Reins would.
     REINS_BUILDER_ADDRESS: "0x000000000000000000000000000000000000dead",
     REINS_BUILDER_FEE_TENTHS_BPS: String(config.builderFeeTenthsBps),
+    REINS_REQUIRE_STOP_LOSS: String(config.requireStopLoss),
   });
 
   if (env["REINS_MODE"] !== "paper" || "REINS_PRIVATE_KEY" in env) {
@@ -365,6 +367,7 @@ export interface DemoSummary {
   refusedByLimits: DecisionRecord[];
   held: HoldRecord[];
   rejectedByExchange: number;
+  stopsSet: number;
   errors: number;
   firstAt?: string;
   lastAt?: string;
@@ -379,6 +382,7 @@ export function summarize(records: LogRecord[]): DemoSummary {
     refusedByLimits: [],
     held: [],
     rejectedByExchange: 0,
+    stopsSet: 0,
     errors: 0,
   };
   for (const record of ordered) {
@@ -395,6 +399,10 @@ export function summarize(records: LogRecord[]): DemoSummary {
       continue;
     }
     if (record.tool === "cancel_order") continue;
+    if (record.tool === "set_stop_loss") {
+      summary.stopsSet++;
+      continue;
+    }
     summary.placed++;
     if (record.outcome?.kind === "filled") summary.filled++;
     if (record.outcome?.kind === "rejected") summary.rejectedByExchange++;
@@ -458,7 +466,7 @@ export function formatReport(
   lines.push(
     `Actions: ${summary.placed} orders sent, ${summary.filled} filled, ` +
       `${summary.refusedByLimits.length} refused by the limits, ` +
-      `${summary.rejectedByExchange} rejected by the market`,
+      `${summary.rejectedByExchange} rejected by the market, ${summary.stopsSet} stop-losses set`,
   );
 
   const lastHold = summary.held.at(-1);

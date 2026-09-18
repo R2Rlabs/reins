@@ -30,6 +30,7 @@ export {
   getPositions,
   getBook,
   getCandles,
+  setStopLoss,
   AGENT_CANDLE_INTERVALS,
   placeOrder,
   cancelOrder,
@@ -88,6 +89,7 @@ export { MockTransport, routeKeyFor, type MockRouteKey, type RecordedCall } from
 
 export type {
   AssetMeta,
+  StopLoss,
   Candle,
   CandleInterval,
   CancelOutcome,

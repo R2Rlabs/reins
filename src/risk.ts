@@ -18,6 +18,14 @@ export interface RiskLimits {
   symbolAllowlist: string[];
   /** Orders per rolling 60s window. */
   maxOrdersPerMinute: number;
+  /**
+   * No new risk while any position is unprotected. When set, an order that
+   * opens or adds to a position is refused if some position has no stop-loss
+   * covering all of it, and an order that fills immediately must bring its own
+   * stop. The agent's own "I'll exit below X" becomes an order the exchange
+   * executes whether or not the agent is awake.
+   */
+  requireStopLoss?: boolean;
 }
 
 export interface AccountState {
@@ -27,6 +35,8 @@ export interface AccountState {
   realizedPnlTodayUsd: number;
   /** Total account value in USD, used for the leverage check. */
   accountValueUsd: number;
+  /** Symbols holding a position that no stop-loss fully covers. */
+  unprotectedSymbols?: string[];
 }
 
 export interface OrderRequest {
@@ -36,10 +46,15 @@ export interface OrderRequest {
   sizeUsd: number;
   /** Orders that can only shrink an existing position skip most checks. */
   reduceOnly?: boolean;
+  /** Fills immediately (crosses the spread) rather than resting on the book. */
+  marketable?: boolean;
+  /** Carries a stop-loss that will cover the symbol's whole position once filled. */
+  hasStopLoss?: boolean;
 }
 
 export type RiskCode =
   | "HALTED_DAILY_LOSS"
+  | "NO_STOP_LOSS"
   | "SYMBOL_NOT_ALLOWED"
   | "RATE_LIMITED"
   | "POSITION_TOO_LARGE"
@@ -149,6 +164,36 @@ export class RiskEngine {
     }
 
     const projected = projectedPositionUsd(order, state);
+    const current = state.positionsUsd[order.symbol] ?? 0;
+    const addsRisk =
+      Math.abs(projected) > Math.abs(current) || Math.sign(projected) * Math.sign(current) < 0;
+
+    if (this.limits.requireStopLoss && addsRisk) {
+      // An order carrying its own stop will cover its symbol, so only other
+      // unprotected positions stand in its way.
+      const unprotected = (state.unprotectedSymbols ?? []).filter(
+        (symbol) => !(order.hasStopLoss && symbol === order.symbol),
+      );
+      if (unprotected.length > 0) {
+        return {
+          allowed: false,
+          code: "NO_STOP_LOSS",
+          reason:
+            `${unprotected.join(", ")} ${unprotected.length === 1 ? "has" : "have"} no stop-loss ` +
+            `covering the whole position. Set one with set_stop_loss before adding risk.`,
+        };
+      }
+      if (order.marketable && !order.hasStopLoss) {
+        return {
+          allowed: false,
+          code: "NO_STOP_LOSS",
+          reason:
+            "An order that fills immediately must carry a stopLoss, so the position " +
+            "is never open without one.",
+        };
+      }
+    }
+
     if (Math.abs(projected) > this.limits.maxPositionUsd) {
       return {
         allowed: false,

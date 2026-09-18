@@ -13,12 +13,14 @@ import {
   type ExchangeRequest,
   type ExchangeResponse,
   type Fill,
+  type FrontendOpenOrder,
   type L2Book,
   type Meta,
   type Network,
   type OrderAction,
   type OrderOutcome,
   type PositionSnapshot,
+  type StopLoss,
   type Tif,
   type WireOrder,
 } from "./types.js";
@@ -304,6 +306,91 @@ export class HyperliquidClient {
     return parseOrderResponse(response);
   }
 
+  /**
+   * A reduce-only stop-market order: once the price reaches `triggerPrice`,
+   * the exchange closes `size` at market, whether or not the agent is awake.
+   * The wire shape is the one the Python SDK signs in its tpsl test vector,
+   * which this library reproduces byte for byte (see signing.test.ts).
+   *
+   * `p` is the worst price the triggered order may fill at. It sits 5% past
+   * the trigger — the SDK's own default slippage for market orders — because a
+   * stop that refuses to fill in a fast market protects nothing.
+   */
+  async placeStopLoss(params: {
+    symbol: string;
+    side: "buy" | "sell";
+    size: number;
+    triggerPrice: number;
+  }): Promise<OrderOutcome> {
+    const signer = this.requireSigner();
+    const asset = await this.assetInfo(params.symbol);
+    const worst = params.side === "sell" ? params.triggerPrice * 0.95 : params.triggerPrice * 1.05;
+    const triggerPx = formatPrice(params.triggerPrice, asset.szDecimals);
+
+    const order: WireOrder = {
+      a: asset.index,
+      b: params.side === "buy",
+      p: formatPrice(worst, asset.szDecimals),
+      s: formatSize(params.size, asset.szDecimals),
+      r: true,
+      t: {
+        trigger: {
+          isMarket: true,
+          triggerPx,
+          tpsl: "sl",
+        },
+      },
+    };
+    const action: OrderAction = { type: "order", orders: [order], grouping: "na" };
+    if (this.builder) {
+      action.builder = { b: this.builder.address, f: this.builder.feeTenthsBps };
+    }
+
+    const response = await this.postExchange(action, signer);
+    const status = response.status === "ok" && response.response.type === "order"
+      ? response.response.data.statuses[0]
+      : undefined;
+    if (typeof status !== "string") return parseOrderResponse(response);
+
+    // Acknowledged without an oid: find the order it created.
+    const stop = (await this.stopLosses()).find(
+      (s) => s.symbol === params.symbol && s.triggerPrice === Number(triggerPx),
+    );
+    return stop
+      ? { kind: "resting", oid: stop.oid }
+      : { kind: "rejected", message: `Stop acknowledged as "${status}" but not found among open orders.` };
+  }
+
+  /** Open stop-loss orders, read from the exchange. */
+  async stopLosses(user?: string): Promise<StopLoss[]> {
+    const address = user ?? this.signer?.address;
+    if (!address) return [];
+    const orders = await this.postInfo<FrontendOpenOrder[]>({
+      type: "frontendOpenOrders",
+      user: address.toLowerCase(),
+    });
+    return orders
+      .filter((o) => o.isTrigger && o.reduceOnly && o.orderType.startsWith("Stop"))
+      .map((o) => ({
+        oid: o.oid,
+        symbol: o.coin,
+        side: o.side === "B" ? ("buy" as const) : ("sell" as const),
+        size: Number(o.sz),
+        triggerPrice: Number(o.triggerPx),
+      }));
+  }
+
+  /** Exact position sizes in asset units, signed, with entry prices. */
+  async openPositions(user?: string): Promise<Record<string, { size: number; entryPrice: number }>> {
+    const state = await this.clearinghouseState(user);
+    const out: Record<string, { size: number; entryPrice: number }> = {};
+    for (const { position } of state.assetPositions) {
+      const size = Number(position.szi);
+      if (size !== 0) out[position.coin] = { size, entryPrice: Number(position.entryPx ?? 0) };
+    }
+    return out;
+  }
+
   async cancelOrder(symbol: string, oid: number): Promise<CancelOutcome> {
     const signer = this.requireSigner();
     const asset = await this.assetInfo(symbol);
@@ -421,6 +508,10 @@ export function parseOrderResponse(response: ExchangeResponse): OrderOutcome {
   const status = response.response.data.statuses[0];
   if (!status) {
     return { kind: "rejected", message: "Exchange returned no order status." };
+  }
+  if (typeof status === "string") {
+    // Accepted, but without an oid; placeStopLoss looks the order up instead.
+    return { kind: "rejected", message: `Order acknowledged as "${status}" with no order id.` };
   }
   if ("resting" in status) return { kind: "resting", oid: status.resting.oid };
   if ("filled" in status) {

@@ -219,7 +219,7 @@ describe("runInit", () => {
     expect(output()).toContain("✓ Limits — max position $5,000 · daily loss $500 · BTC, ETH");
     expect(output()).toContain("decisions.jsonl");
     expect(output()).toContain("Created");
-    expect(output()).toContain("8 tools on stdio");
+    expect(output()).toContain("9 tools on stdio");
   });
 
   it("refuses to clobber an existing reins entry and writes nothing", async () => {

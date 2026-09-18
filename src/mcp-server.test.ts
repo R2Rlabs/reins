@@ -11,6 +11,7 @@ import {
   getPositions,
   marketablePrice,
   placeOrder,
+  setStopLoss,
   type McpServerDeps,
   type ToolResult,
 } from "./mcp-server.js";
@@ -92,12 +93,13 @@ function fillsWithPnl(closedPnl: string, fee = "0") {
   ];
 }
 
-function setup(options: { fills?: unknown; limits?: RiskLimits } = {}) {
+function setup(options: { fills?: unknown; limits?: RiskLimits; states?: unknown[]; openOrders?: unknown[] } = {}) {
   const transport = new MockTransport()
     .reply("info:meta", META)
-    .reply("info:clearinghouseState", STATE)
+    .reply("info:clearinghouseState", ...(options.states ?? [STATE]))
     .reply("info:userFills", options.fills ?? [])
     .reply("info:l2Book", BOOK)
+    .reply("info:frontendOpenOrders", options.openOrders ?? [])
     .reply("exchange:order", RESTING)
     .reply("exchange:cancel", {
       status: "ok",
@@ -462,5 +464,55 @@ describe("server wiring", () => {
   it("registers every tool without the SDK rejecting a schema", () => {
     const { deps } = setup();
     expect(() => createMcpServer(deps)).not.toThrow();
+  });
+});
+
+describe("stop-losses on the live client", () => {
+  const btcStop = {
+    coin: "BTC",
+    side: "A",
+    limitPx: "90250",
+    sz: "0.125",
+    oid: 777,
+    timestamp: 1,
+    isTrigger: true,
+    triggerPx: "95000",
+    triggerCondition: "Price below 95000",
+    orderType: "Stop Market",
+    reduceOnly: true,
+    isPositionTpsl: false,
+    origSz: "0.125",
+  };
+
+  it("set_stop_loss sends a reduce-only trigger sized to the whole position", async () => {
+    const { deps, transport } = setup();
+    const body = parse(await setStopLoss(deps, { symbol: "BTC", triggerPrice: 95_000, reason: "Below support." }));
+
+    expect(body["stopLoss"]).toMatchObject({ orderId: 5150, side: "sell", size: 0.125, triggerPrice: 95_000 });
+    expect(lastOrder(transport)).toMatchObject({
+      b: false,
+      s: "0.125",
+      r: true,
+      t: { trigger: { isMarket: true, triggerPx: "95000", tpsl: "sl" } },
+    });
+  });
+
+  it("close_position cancels a stop the exchange still holds", async () => {
+    const flat = { ...STATE, assetPositions: [] };
+    const { deps, transport } = setup({ states: [STATE, flat], openOrders: [btcStop] });
+    const body = parse(await closePosition(deps, { symbol: "BTC", reason: "Done." }));
+
+    expect(body["cancelledStopLosses"]).toEqual([777]);
+    const cancel = transport.callsTo("exchange:cancel")[0]!;
+    expect((cancel.body["action"] as { cancels: unknown[] }).cancels).toEqual([{ a: 0, o: 777 }]);
+  });
+
+  it("get_positions reports the stop and nothing unprotected", async () => {
+    const { deps } = setup({ openOrders: [btcStop] });
+    const body = parse(await getPositions(deps));
+    expect(body["stopLosses"]).toEqual([
+      { orderId: 777, symbol: "BTC", side: "sell", size: 0.125, triggerPrice: 95_000 },
+    ]);
+    expect(body["unprotected"]).toEqual([]);
   });
 });

@@ -164,6 +164,7 @@ describe("buildServerEnv", () => {
     maxOrdersPerMin: 6,
     paperBalanceUsd: 10_000,
     builderFeeTenthsBps: 10,
+    requireStopLoss: true,
     paperFile: "/data/paper.json",
     logFile: "/data/decisions.jsonl",
   };
@@ -194,6 +195,7 @@ describe("buildServerEnv", () => {
       REINS_DAILY_LOSS_USD: "300",
       REINS_LOG_FILE: "/data/decisions.jsonl",
       REINS_PAPER_FILE: "/data/paper.json",
+      REINS_REQUIRE_STOP_LOSS: "true",
     });
   });
 });

@@ -24,6 +24,8 @@ const SCRIPT: Step[] = [
         symbol: "BTC",
         side: "buy",
         sizeUsd: 500,
+        // Far below the market, so it never fires: this exercises placing a stop.
+        stopLoss: 1_000,
         reason: "[scripted] Wiring check: a small marketable buy that fits inside every limit.",
       },
     },
@@ -36,6 +38,7 @@ const SCRIPT: Step[] = [
         symbol: "BTC",
         side: "buy",
         sizeUsd: 50_000,
+        stopLoss: 1_000,
         reason: "[scripted] Wiring check: deliberately oversized to confirm the position cap refuses it.",
       },
     },

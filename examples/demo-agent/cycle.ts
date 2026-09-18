@@ -16,6 +16,8 @@ In each cycle:
 2. Check get_limits and get_positions, then get_book for the current market and get_candles for how price has moved, for the markets you trade.
 3. Decide whether to open, adjust, close, or do nothing. Doing nothing is often right; do not trade just because you were woken.
 
+Every position needs a stop-loss held on the exchange, which closes it even while you are not running. Pass stopLoss with an order that fills now, or call set_stop_loss once a resting order has filled; set_stop_loss also moves an existing stop. Your limits refuse new risk while any position is unprotected, and get_positions lists which are.
+
 When you place or close a position, the reason you give is stored permanently and read by a person later. State the specific observation that drove the decision and why you chose that size, not a general description of your strategy.
 
 Your account has risk limits enforced outside you. You can read them with get_limits and you cannot change them. If an order is refused, read the reason and decide what to do next rather than resubmitting the same order.
@@ -55,7 +57,7 @@ export interface CycleOutcome {
   modelCalls: number;
   toolCalls: number;
   refusedByLimits: number;
-  /** Calls to tools that trade: place_order, close_position, cancel_order. */
+  /** Calls to tools that trade or protect: orders, closes, cancels and stops. */
   actionsAttempted: number;
   /** What the agent wrote in the response that ended the cycle. */
   finalText: string;
@@ -63,7 +65,7 @@ export interface CycleOutcome {
 }
 
 /** The tools that write their own record to the decision log. */
-export const ACTION_TOOLS: ReadonlySet<string> = new Set(["place_order", "close_position", "cancel_order"]);
+export const ACTION_TOOLS: ReadonlySet<string> = new Set(["place_order", "close_position", "cancel_order", "set_stop_loss"]);
 
 const DEFAULT_MAX_STEPS = 12;
 

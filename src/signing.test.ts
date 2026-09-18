@@ -51,6 +51,38 @@ describe("reference vectors", () => {
     expect(signature).toEqual(TESTNET);
   });
 
+  // test_l1_action_signing_tpsl_order_matches: a stop-loss trigger order. The
+  // trigger's keys go isMarket, triggerPx, tpsl; any other order is a
+  // different hash, and this is what pins it.
+  it("matches the Python SDK's stop-loss trigger order on both networks", async () => {
+    const signer = new PrivateKeySigner(REFERENCE_KEY);
+    const action = {
+      type: "order",
+      orders: [
+        {
+          a: 1,
+          b: true,
+          p: "100",
+          s: "100",
+          r: false,
+          t: { trigger: { isMarket: true, triggerPx: "103", tpsl: "sl" } },
+        },
+      ],
+      grouping: "na",
+    };
+    const base = { action, nonce: 0, vaultAddress: null };
+    expect(await signer.signL1Action({ ...base, isTestnet: false })).toEqual({
+      r: "0x98343f2b5ae8e26bb2587daad3863bc70d8792b09af1841b6fdd530a2065a3f9",
+      s: "0x6b5bb6bb0633b710aa22b721dd9dee6d083646a5f8e581a20b545be6c1feb405",
+      v: 27,
+    });
+    expect(await signer.signL1Action({ ...base, isTestnet: true })).toEqual({
+      r: "0x971c554d917c44e0e1b6cc45d8f9404f32172a9d3b3566262347d0302896a2e4",
+      s: "0x206257b104788f80450f8e786c329daa589aa0b32ba96948201ae556d5637eac",
+      v: 28,
+    });
+  });
+
   it("produces different signatures per network from the same action", async () => {
     const signer = new PrivateKeySigner(REFERENCE_KEY);
     const base = { action: DUMMY_ACTION, nonce: 0, vaultAddress: null };

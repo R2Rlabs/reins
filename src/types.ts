@@ -113,9 +113,48 @@ export interface WireOrder {
   s: string;
   /** reduceOnly */
   r: boolean;
-  t: { limit: { tif: Tif } };
+  t: { limit: { tif: Tif } } | { trigger: TriggerWire };
   /** Client order id, 128-bit hex. */
   c?: string;
+}
+
+/**
+ * A trigger order type on the wire. Key order is part of the signed hash and
+ * matches the Python SDK's order_type_to_wire: isMarket, triggerPx, tpsl.
+ */
+export interface TriggerWire {
+  isMarket: boolean;
+  /** Price, formatted like p. */
+  triggerPx: string;
+  tpsl: "tp" | "sl";
+}
+
+/** A reduce-only stop-market order protecting a position. */
+export interface StopLoss {
+  oid: number;
+  symbol: string;
+  /** The side that closes the position: sell for a long, buy for a short. */
+  side: "buy" | "sell";
+  /** Asset units. */
+  size: number;
+  triggerPrice: number;
+}
+
+/** One row of the frontendOpenOrders info response. */
+export interface FrontendOpenOrder {
+  coin: string;
+  side: "A" | "B";
+  limitPx: string;
+  sz: string;
+  oid: number;
+  timestamp: number;
+  isTrigger: boolean;
+  triggerPx: string;
+  triggerCondition: string;
+  orderType: string;
+  reduceOnly: boolean;
+  isPositionTpsl: boolean;
+  origSz: string;
 }
 
 export interface BuilderFee {
@@ -153,7 +192,10 @@ export interface ExchangeRequest {
 export type OrderStatus =
   | { resting: { oid: number } }
   | { filled: { totalSz: string; avgPx: string; oid: number } }
-  | { error: string };
+  | { error: string }
+  // Trigger orders can be acknowledged with a bare string rather than an oid.
+  | "waitingForTrigger"
+  | "waitingForFill";
 
 export type ExchangeResponse =
   | {

@@ -390,6 +390,78 @@ describe("candles", () => {
   });
 });
 
+describe("stop-loss orders", () => {
+  const STOP = { symbol: "ETH", side: "sell" as const, size: 0.7557, triggerPrice: 2630.8 };
+
+  function openOrder(overrides: Record<string, unknown> = {}) {
+    return {
+      coin: "ETH",
+      side: "A",
+      limitPx: "2499.3",
+      sz: "0.7557",
+      oid: 42,
+      timestamp: 1,
+      isTrigger: true,
+      triggerPx: "2630.8",
+      triggerCondition: "Price below 2630.8",
+      orderType: "Stop Market",
+      reduceOnly: true,
+      isPositionTpsl: false,
+      origSz: "0.7557",
+      ...overrides,
+    };
+  }
+
+  it("sends a reduce-only stop-market trigger in the SDK's shape", async () => {
+    transport.reply("exchange:order", RESTING);
+    await client({ builder: { address: "0x000000000000000000000000000000000000dEaD", feeTenthsBps: 20 } })
+      .placeStopLoss(STOP);
+
+    const order = lastOrderAction().orders[0]!;
+    expect(order).toMatchObject({ a: 1, b: false, s: "0.7557", r: true });
+    expect(order.t).toEqual({ trigger: { isMarket: true, triggerPx: "2630.8", tpsl: "sl" } });
+    // Key order is part of the signed hash.
+    expect(Object.keys((order.t as { trigger: object }).trigger)).toEqual(["isMarket", "triggerPx", "tpsl"]);
+    // Worst fill 5% past the trigger, so the stop fills in a fast market.
+    expect(order.p).toBe("2499.3");
+    expect(lastOrderAction().builder).toEqual({ b: "0x000000000000000000000000000000000000dead", f: 20 });
+  });
+
+  it("puts a short's stop above the trigger", async () => {
+    transport.reply("exchange:order", RESTING);
+    await client().placeStopLoss({ ...STOP, side: "buy", triggerPrice: 2700 });
+    expect(lastOrderAction().orders[0]).toMatchObject({ b: true, p: "2835" });
+  });
+
+  it("finds the order id when the exchange acknowledges with a bare string", async () => {
+    transport
+      .reply("exchange:order", { status: "ok", response: { type: "order", data: { statuses: ["waitingForTrigger"] } } })
+      .reply("info:frontendOpenOrders", [openOrder()]);
+    expect(await client().placeStopLoss(STOP)).toEqual({ kind: "resting", oid: 42 });
+  });
+
+  it("lists only reduce-only stop triggers as stop-losses", async () => {
+    transport.reply("info:frontendOpenOrders", [
+      openOrder(),
+      openOrder({ oid: 43, isTrigger: false, orderType: "Limit", triggerPx: "0.0" }),
+      openOrder({ oid: 44, orderType: "Take Profit Market" }),
+      openOrder({ oid: 45, side: "B", coin: "BTC", triggerPx: "105000", sz: "0.01" }),
+    ]);
+    expect(await client().stopLosses()).toEqual([
+      { oid: 42, symbol: "ETH", side: "sell", size: 0.7557, triggerPrice: 2630.8 },
+      { oid: 45, symbol: "BTC", side: "buy", size: 0.01, triggerPrice: 105_000 },
+    ]);
+  });
+
+  it("reads exact signed position sizes", async () => {
+    transport.reply("info:clearinghouseState", STATE);
+    expect(await client().openPositions()).toEqual({
+      ETH: { size: -0.0335, entryPrice: 2986.3 },
+      BTC: { size: 0.25, entryPrice: 50_000 },
+    });
+  });
+});
+
 describe("transport errors", () => {
   it("wraps a non-2xx response", async () => {
     transport.failWith(503, "upstream unavailable");

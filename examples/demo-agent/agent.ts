@@ -51,6 +51,9 @@ const SERVER: Omit<DemoServerConfig, "paperFile" | "logFile"> = {
   maxOrdersPerMin: 6,
   paperBalanceUsd: 10_000,
   builderFeeTenthsBps: 10,
+  // Every position gets a stop the exchange holds, so an exit the agent
+  // describes is one that happens even between cycles.
+  requireStopLoss: true,
 };
 
 const HELP = `Reins demo agent — Claude trading Hyperliquid on paper through Reins.

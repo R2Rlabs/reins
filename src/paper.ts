@@ -8,6 +8,7 @@ import type {
   CandleInterval,
   L2Book,
   OrderOutcome,
+  StopLoss,
   Tif,
 } from "./types.js";
 
@@ -32,14 +33,19 @@ import type {
  *   them, never merely to them — at your own price you are behind a queue you
  *   cannot see, and assuming you get filled there is the most common way a
  *   paper equity curve lies.
+ * - Fills and stop-loss triggers between polls, from one-minute candles.
  *
- * Not modelled, and each one flatters the simulation:
+ * Not modelled, and most of them flatter the simulation:
  * - Latency. Fills are priced off the book as it was when the tool was called.
  * - Market impact. Your own order never moves the price or removes liquidity
  *   that other participants would have taken.
  * - Funding payments on perps, which accrue against open positions.
- * - Book movement between polls. A wick that would have filled a resting order
- *   is missed unless a tool happens to be called while it is happening.
+ * - Slippage past a stop's trigger inside a minute that has already gone by:
+ *   such a stop fills at its trigger, or at the candle's open if it gapped.
+ * - Triggering on mark price. Hyperliquid triggers stops on the mark price;
+ *   this uses traded prices, which can differ briefly.
+ * - The minute an order was placed in, and anything older than the last 5000
+ *   one-minute candles (about three days). A fill there is missed either way.
  *
  * Treat a paper equity curve as an upper bound on live performance, not an
  * estimate of it.
@@ -69,6 +75,21 @@ export interface RestingOrder {
   candlesCheckedFrom?: number;
 }
 
+/** A reduce-only stop-market order, waiting for its trigger. */
+export interface PaperStop {
+  oid: number;
+  symbol: string;
+  /** The side that closes the position. */
+  side: "buy" | "sell";
+  size: number;
+  triggerPrice: number;
+  placedAt: number;
+  candlesCheckedFrom?: number;
+}
+
+/** Anything the matcher watches the market for. */
+type Watched = { symbol: string; placedAt: number; candlesCheckedFrom?: number };
+
 export interface PaperFill {
   oid: number;
   symbol: string;
@@ -86,6 +107,8 @@ export interface PaperState {
   balanceUsd: number;
   positions: Record<string, PaperPosition>;
   resting: RestingOrder[];
+  /** Absent in saves from before stop-losses existed. */
+  stops?: PaperStop[];
   fills: PaperFill[];
   nextOid: number;
 }
@@ -164,6 +187,7 @@ function emptyState(startingBalanceUsd: number): PaperState {
     balanceUsd: startingBalanceUsd,
     positions: {},
     resting: [],
+    stops: [],
     fills: [],
     nextOid: 1,
   };
@@ -399,18 +423,77 @@ export class PaperClient implements TradingClient {
           `${filled.price}, ${new Date(filled.time).toISOString()}.`,
       };
     }
-    const before = state.resting.length;
-    state.resting = state.resting.filter(
-      (order) => !(order.oid === oid && order.symbol === symbol),
-    );
-    if (state.resting.length === before) {
+    const matches = (order: { oid: number; symbol: string }) =>
+      order.oid === oid && order.symbol === symbol;
+    const stops = state.stops ?? [];
+    if (!state.resting.some(matches) && !stops.some(matches)) {
       return {
         kind: "rejected",
         message: "Order was never placed, already cancelled, or filled.",
       };
     }
+    state.resting = state.resting.filter((order) => !matches(order));
+    state.stops = stops.filter((stop) => !matches(stop));
     await this.persist();
     return { kind: "cancelled" };
+  }
+
+  placeStopLoss(params: {
+    symbol: string;
+    side: "buy" | "sell";
+    size: number;
+    triggerPrice: number;
+  }): Promise<OrderOutcome> {
+    return this.serialize(async () => {
+      const state = await this.load();
+      await this.matchResting(state);
+      const held = state.positions[params.symbol]?.size ?? 0;
+      const closes = (held > 0 && params.side === "sell") || (held < 0 && params.side === "buy");
+      if (!closes) {
+        return {
+          kind: "rejected",
+          message: `A ${params.side} stop would not reduce an existing ${params.symbol} position.`,
+        };
+      }
+      const asset = await this.market.assetInfo(params.symbol);
+      const size = roundTo(Math.min(params.size, Math.abs(held)), asset.szDecimals);
+      if (size <= 0) {
+        return { kind: "rejected", message: `Stop size rounds to zero for ${params.symbol}.` };
+      }
+      const oid = state.nextOid++;
+      (state.stops ??= []).push({
+        oid,
+        symbol: params.symbol,
+        side: params.side,
+        size,
+        triggerPrice: params.triggerPrice,
+        placedAt: this.now(),
+      });
+      await this.persist();
+      return { kind: "resting", oid };
+    });
+  }
+
+  stopLosses(): Promise<StopLoss[]> {
+    return this.serialize(async () => {
+      const state = await this.load();
+      await this.matchResting(state);
+      return (state.stops ?? []).map(({ oid, symbol, side, size, triggerPrice }) => ({
+        oid,
+        symbol,
+        side,
+        size,
+        triggerPrice,
+      }));
+    });
+  }
+
+  openPositions(): Promise<Record<string, { size: number; entryPrice: number }>> {
+    return this.serialize(async () => {
+      const state = await this.load();
+      await this.matchResting(state);
+      return structuredClone(state.positions);
+    });
   }
 
   // --- simulation internals -------------------------------------------------
@@ -449,79 +532,141 @@ export class PaperClient implements TradingClient {
    * them, so a reduce-only order sees the position as it was at the time.
    */
   private async matchResting(state: PaperState): Promise<void> {
-    if (state.resting.length === 0) return;
+    const stops = (state.stops ??= []);
+    if (state.resting.length === 0 && stops.length === 0) return;
 
     const now = this.now();
-    const symbols = [...new Set(state.resting.map((order) => order.symbol))];
+    const watched: Watched[] = [...state.resting, ...stops];
+    const symbols = [...new Set(watched.map((order) => order.symbol))];
     const books = new Map<string, L2Book>();
     const candles = new Map<string, Candle[]>();
     await Promise.all(
       symbols.map(async (symbol) => {
         books.set(symbol, await this.market.l2Book(symbol));
-        candles.set(symbol, await this.candlesSince(symbol, state.resting, now));
+        candles.set(symbol, await this.candlesSince(symbol, watched, now));
       }),
     );
 
-    const due: { order: RestingOrder; time: number }[] = [];
-    const survivors: RestingOrder[] = [];
-    let changed = false;
+    type Due =
+      | { kind: "resting"; order: RestingOrder; time: number }
+      | { kind: "stop"; stop: PaperStop; time: number; price: number | undefined };
+    const due: Due[] = [];
+    const restingLeft: RestingOrder[] = [];
+    const stopsLeft: PaperStop[] = [];
+
+    const markChecked = (order: Watched) => {
+      // Complete candles need not be read again; a still-forming one does.
+      const last = candles.get(order.symbol)?.at(-1);
+      if (last) order.candlesCheckedFrom = last.T < now ? last.T + 1 : last.t;
+    };
 
     for (const order of state.resting) {
-      const symbolCandles = candles.get(order.symbol) ?? [];
-      const time = tradedThroughAt(order, symbolCandles, books.get(order.symbol), now);
-      if (time !== undefined) {
-        due.push({ order, time });
-        continue;
+      const time = tradedThroughAt(order, candles.get(order.symbol) ?? [], books.get(order.symbol), now);
+      if (time === undefined) {
+        markChecked(order);
+        restingLeft.push(order);
+      } else {
+        due.push({ kind: "resting", order, time });
       }
-      // Complete candles need not be read again; a still-forming one does.
-      const last = symbolCandles.at(-1);
-      if (last) order.candlesCheckedFrom = last.T < now ? last.T + 1 : last.t;
-      survivors.push(order);
+    }
+    for (const stop of stops) {
+      const hit = stopTriggeredAt(stop, candles.get(stop.symbol) ?? [], books.get(stop.symbol), now);
+      if (hit === undefined) {
+        markChecked(stop);
+        stopsLeft.push(stop);
+      } else {
+        due.push({ kind: "stop", stop, time: hit.time, price: hit.price });
+      }
     }
 
+    const changed = due.length > 0;
     due.sort((a, b) => a.time - b.time);
-    for (const { order, time } of due) {
-      if (order.reduceOnly) {
-        const held = state.positions[order.symbol]?.size ?? 0;
-        const opposes =
-          (held > 0 && order.side === "sell") || (held < 0 && order.side === "buy");
-        if (held === 0 || !opposes) {
-          changed = true; // the position it was protecting is gone; drop it
-          continue;
-        }
-      }
-
-      this.applyFill(
-        state,
-        {
-          oid: order.oid,
-          symbol: order.symbol,
-          side: order.side,
-          size: order.size,
-          price: order.price,
-          liquidity: "maker",
-        },
-        time,
-      );
-      changed = true;
+    for (const event of due) {
+      if (event.kind === "resting") this.fillResting(state, event.order, event.time);
+      else this.fillStop(state, event.stop, event.time, event.price, books.get(event.stop.symbol));
     }
 
-    if (changed || survivors.length !== state.resting.length) {
-      state.resting = survivors;
+    // A stop with no position left to protect has nothing to do.
+    const protecting = stopsLeft.filter((stop) => {
+      const held = state.positions[stop.symbol]?.size ?? 0;
+      return (held > 0 && stop.side === "sell") || (held < 0 && stop.side === "buy");
+    });
+
+    if (changed || restingLeft.length !== state.resting.length || protecting.length !== stops.length) {
+      state.resting = restingLeft;
+      state.stops = protecting;
       await this.persist();
     }
   }
 
+  private fillResting(state: PaperState, order: RestingOrder, time: number): void {
+    if (order.reduceOnly) {
+      const held = state.positions[order.symbol]?.size ?? 0;
+      const opposes = (held > 0 && order.side === "sell") || (held < 0 && order.side === "buy");
+      if (held === 0 || !opposes) return; // the position it was protecting is gone; drop it
+    }
+    this.applyFill(
+      state,
+      {
+        oid: order.oid,
+        symbol: order.symbol,
+        side: order.side,
+        size: order.size,
+        price: order.price,
+        liquidity: "maker",
+      },
+      time,
+    );
+  }
+
   /**
-   * One-minute candles covering every resting order on `symbol` since it was
+   * A triggered stop closes what is left of the position, as a taker. Seen in
+   * the book right now, it walks the real bids or asks. Seen only in a past
+   * candle, the book at that moment is gone, so it fills at the trigger — or
+   * at the candle's open if the market gapped straight past it. That ignores
+   * slippage beyond the trigger inside the minute, which flatters the result,
+   * and the README says so.
+   */
+  private fillStop(
+    state: PaperState,
+    stop: PaperStop,
+    time: number,
+    candlePrice: number | undefined,
+    book: L2Book | undefined,
+  ): void {
+    const held = state.positions[stop.symbol]?.size ?? 0;
+    const opposes = (held > 0 && stop.side === "sell") || (held < 0 && stop.side === "buy");
+    if (!opposes) return;
+    const size = Math.min(stop.size, Math.abs(held));
+
+    let price = candlePrice;
+    let filled = size;
+    if (price === undefined && book) {
+      const levels = stop.side === "sell" ? book.levels[0] : book.levels[1];
+      const worst = stop.side === "sell" ? stop.triggerPrice * 0.95 : stop.triggerPrice * 1.05;
+      const walked = walkBook(levels ?? [], stop.side, worst, size);
+      price = walked.avgPrice;
+      filled = walked.filled;
+    }
+    if (price === undefined || filled <= 0) return;
+
+    this.applyFill(
+      state,
+      { oid: stop.oid, symbol: stop.symbol, side: stop.side, size: filled, price, liquidity: "taker" },
+      time,
+    );
+  }
+
+  /**
+   * One-minute candles covering every watched order on `symbol` since it was
    * last checked. The API keeps the latest 5000, a little over three days, so
    * an order resting longer than that is only checked across those. If the
    * candles cannot be fetched, the book check still runs; the gap it leaves is
    * the one this closes, not a wrong fill.
    */
-  private async candlesSince(symbol: string, resting: RestingOrder[], now: number): Promise<Candle[]> {
+  private async candlesSince(symbol: string, watched: Watched[], now: number): Promise<Candle[]> {
     const from = Math.min(
-      ...resting
+      ...watched
         .filter((order) => order.symbol === symbol)
         .map((order) => Math.max(order.placedAt, order.candlesCheckedFrom ?? 0)),
     );
@@ -566,6 +711,37 @@ export class PaperClient implements TradingClient {
       time,
     });
   }
+}
+
+/**
+ * When a stop triggered, and at what price if that was in a past candle.
+ * Triggers fire on reaching the price — a stop is not in a queue — so a sell
+ * stop goes off when the low touches it. From the book right now, the price is
+ * left to walking the book.
+ */
+export function stopTriggeredAt(
+  stop: PaperStop,
+  candles: Candle[],
+  book: L2Book | undefined,
+  now: number,
+): { time: number; price: number | undefined } | undefined {
+  const from = Math.max(stop.placedAt, stop.candlesCheckedFrom ?? 0);
+  for (const candle of candles) {
+    if (candle.t < from) continue;
+    const open = Number(candle.o);
+    if (stop.side === "sell" && Number(candle.l) <= stop.triggerPrice) {
+      return { time: candle.t, price: Math.min(stop.triggerPrice, open) };
+    }
+    if (stop.side === "buy" && Number(candle.h) >= stop.triggerPrice) {
+      return { time: candle.t, price: Math.max(stop.triggerPrice, open) };
+    }
+  }
+  if (!book) return undefined;
+  const reached =
+    stop.side === "sell"
+      ? (bestBid(book) ?? Infinity) <= stop.triggerPrice
+      : (bestAsk(book) ?? -Infinity) >= stop.triggerPrice;
+  return reached ? { time: now, price: undefined } : undefined;
 }
 
 /**
