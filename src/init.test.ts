@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { getAddress } from "viem";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_BUILDER_FEE_TENTHS_BPS,
@@ -68,9 +69,12 @@ describe("parseInitArgs", () => {
 describe("the builder fee", () => {
   const address = "0x1111111111111111111111111111111111111111";
 
-  it("is only ever empty or a well-formed address", () => {
-    // Guards the day the constant is filled in by hand.
-    expect(REINS_BUILDER_ADDRESS === "" || /^0x[0-9a-fA-F]{40}$/.test(REINS_BUILDER_ADDRESS)).toBe(true);
+  it("is only ever empty or a correctly checksummed address", () => {
+    // A mistyped character here would pay the fees to nobody. The mixed-case
+    // checksum catches that; lowercase would not.
+    if (REINS_BUILDER_ADDRESS !== "") {
+      expect(getAddress(REINS_BUILDER_ADDRESS)).toBe(REINS_BUILDER_ADDRESS);
+    }
   });
 
   it("defaults to 2 bp, in tenths as Hyperliquid wants it", () => {

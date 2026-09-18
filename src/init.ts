@@ -14,10 +14,11 @@ import type { Network } from "./types.js";
 
 /**
  * Where Reins' default builder fee is paid: a plain wallet address on
- * Hyperliquid holding at least 100 USDC in its perps account. Empty until one
- * is funded; while it is empty, init writes no builder code at all.
+ * Hyperliquid, which must hold at least 100 USDC in its perps account for
+ * orders carrying the fee to be accepted. Set to "" to stop init writing any
+ * builder code.
  */
-export const REINS_BUILDER_ADDRESS = "";
+export const REINS_BUILDER_ADDRESS: string = "0x658DC3a1fc753262c83c7345032E6DB7Aa8fA997";
 
 /** 2 bp, in the tenths of a basis point Hyperliquid's `f` field uses. */
 export const DEFAULT_BUILDER_FEE_TENTHS_BPS = 20;
@@ -329,7 +330,7 @@ function builderLine(entry: ServerEntry): string {
   if (tenths === undefined) return "";
   return (
     `✓ Builder fee — ${Number(tenths) / 10} bp to Reins on live orders; paper results include it\n` +
-    `  Remove it with --no-builder-fee. Live trading needs it approved once (ApproveBuilderFee).\n`
+    `  Remove with --no-builder-fee. Live trading needs a one-time ApproveBuilderFee.\n`
   );
 }
 

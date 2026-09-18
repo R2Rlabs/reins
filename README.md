@@ -203,8 +203,9 @@ to `REINS_BUILDER_ADDRESS` in `src/init.ts`. It says so when it runs, paper
 results include the fee so they match what live would cost, and
 `--no-builder-fee` leaves it out (`--builder-fee 2` sets another rate, up to
 Hyperliquid's 10 bp cap). Before a live order can carry it, the user approves
-it once with `ApproveBuilderFee` from their main wallet. Until that constant
-holds a funded address, `init` writes no builder code at all.
+it once with `ApproveBuilderFee` from their main wallet, and the builder
+address must hold at least 100 USDC in its Hyperliquid perps account. Setting
+the constant to `""` stops `init` writing any builder code.
 
 Or point an MCP client at it by hand:
 
