@@ -5,7 +5,7 @@
     "at": "2026-09-17T20:35:55.537Z",
     "v": 1
   },
-  "title": "Leash — agent execution layer on Hyperliquid",
+  "title": "Reins — agent execution layer on Hyperliquid",
   "launch": { "view": "canvas" },
   "pages": [],
   "boards": {
@@ -31,14 +31,14 @@
       "w": 240,
       "x": 0,
       "y": -300,
-      "text": "Leash — agent execution layer on Hyperliquid"
+      "text": "Reins — agent execution layer on Hyperliquid"
     },
     "placeholder": {
       "color": "orange",
       "w": 320,
       "x": 2760,
       "y": 0,
-      "text": "Updated to match what is actually built. Name, numbers and addresses are still placeholders. Screens are clickable — click through landing, quickstart, dashboard, agent, sandbox and the decision log."
+      "text": "Updated to match what is actually built. Numbers and addresses are placeholders. Screens are clickable — click through landing, quickstart, dashboard, agent, sandbox and the decision log."
     },
     "built": {
       "color": "green",

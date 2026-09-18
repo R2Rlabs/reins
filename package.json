@@ -1,5 +1,5 @@
 {
-  "name": "@leash/hyperliquid",
+  "name": "reins",
   "version": "0.0.1",
   "private": true,
   "description": "Execution layer for trading agents on Hyperliquid — risk limits enforced outside the model.",
@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "bin": {
-    "leash-hyperliquid": "./dist/bin/serve.js"
+    "reins": "./dist/bin/serve.js"
   },
   "scripts": {
     "test": "vitest run",

@@ -32,41 +32,41 @@ function num(name: string, fallback?: number): number {
 }
 
 function readLimits(): RiskLimits {
-  const symbols = (process.env["LEASH_SYMBOLS"] ?? "")
+  const symbols = (process.env["REINS_SYMBOLS"] ?? "")
     .split(",")
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
   if (symbols.length === 0) {
     throw new Error(
-      "LEASH_SYMBOLS is required — an empty allowlist would refuse every order.",
+      "REINS_SYMBOLS is required — an empty allowlist would refuse every order.",
     );
   }
   return {
-    maxPositionUsd: num("LEASH_MAX_POSITION_USD"),
-    maxLeverage: num("LEASH_MAX_LEVERAGE", 3),
-    dailyLossLimitUsd: num("LEASH_DAILY_LOSS_USD"),
+    maxPositionUsd: num("REINS_MAX_POSITION_USD"),
+    maxLeverage: num("REINS_MAX_LEVERAGE", 3),
+    dailyLossLimitUsd: num("REINS_DAILY_LOSS_USD"),
     symbolAllowlist: symbols,
-    maxOrdersPerMinute: num("LEASH_MAX_ORDERS_PER_MIN", 12),
+    maxOrdersPerMinute: num("REINS_MAX_ORDERS_PER_MIN", 12),
   };
 }
 
 function readBuilder(): BuilderConfig | undefined {
-  const address = process.env["LEASH_BUILDER_ADDRESS"];
+  const address = process.env["REINS_BUILDER_ADDRESS"];
   if (!address) return undefined;
-  return { address, feeTenthsBps: num("LEASH_BUILDER_FEE_TENTHS_BPS", 10) };
+  return { address, feeTenthsBps: num("REINS_BUILDER_FEE_TENTHS_BPS", 10) };
 }
 
 async function main(): Promise<void> {
-  const network = (process.env["LEASH_NETWORK"] ?? "testnet") as Network;
+  const network = (process.env["REINS_NETWORK"] ?? "testnet") as Network;
   if (network !== "testnet" && network !== "mainnet") {
-    throw new Error(`LEASH_NETWORK must be "testnet" or "mainnet", got "${network}".`);
+    throw new Error(`REINS_NETWORK must be "testnet" or "mainnet", got "${network}".`);
   }
 
   // Paper is the default. Trading real money should take a deliberate act,
   // not the absence of one.
-  const mode = process.env["LEASH_MODE"] ?? "paper";
+  const mode = process.env["REINS_MODE"] ?? "paper";
   if (mode !== "paper" && mode !== "live") {
-    throw new Error(`LEASH_MODE must be "paper" or "live", got "${mode}".`);
+    throw new Error(`REINS_MODE must be "paper" or "live", got "${mode}".`);
   }
 
   const limits = readLimits();
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
 
   // Only live mode ever holds a key. Paper never signs anything, so it is not
   // given the means to.
-  const privateKey = process.env["LEASH_PRIVATE_KEY"];
+  const privateKey = process.env["REINS_PRIVATE_KEY"];
   const signer =
     mode === "live" && privateKey ? new PrivateKeySigner(privateKey) : undefined;
 
@@ -88,8 +88,8 @@ async function main(): Promise<void> {
   let banner: string;
 
   if (mode === "paper") {
-    const balance = num("LEASH_PAPER_BALANCE", 10_000);
-    const file = process.env["LEASH_PAPER_FILE"];
+    const balance = num("REINS_PAPER_BALANCE", 10_000);
+    const file = process.env["REINS_PAPER_FILE"];
     client = new PaperClient({
       market,
       startingBalanceUsd: balance,
@@ -111,10 +111,10 @@ async function main(): Promise<void> {
   } else {
     client = market;
     banner =
-      `live — READ-ONLY: set LEASH_PRIVATE_KEY to trade. Reads work; orders throw\n`;
+      `live — READ-ONLY: set REINS_PRIVATE_KEY to trade. Reads work; orders throw\n`;
   }
 
-  const logFile = process.env["LEASH_LOG_FILE"];
+  const logFile = process.env["REINS_LOG_FILE"];
   const log: DecisionLog = logFile
     ? new FileDecisionLog(logFile)
     : new MemoryDecisionLog();
@@ -123,7 +123,7 @@ async function main(): Promise<void> {
   const server = createMcpServer({ client, engine, log });
 
   process.stderr.write(
-    `leash-hyperliquid on ${network}\n` +
+    `reins on ${network}\n` +
       `  mode            ${banner}` +
       `  max position    $${limits.maxPositionUsd.toLocaleString()}\n` +
       `  daily loss      $${limits.dailyLossLimitUsd.toLocaleString()}\n` +
@@ -138,6 +138,6 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`leash-hyperliquid failed to start: ${message}\n`);
+  process.stderr.write(`reins failed to start: ${message}\n`);
   process.exit(1);
 });

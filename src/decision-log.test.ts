@@ -147,7 +147,7 @@ describe("FileDecisionLog", () => {
   let path: string;
 
   beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), "leash-log-"));
+    dir = await mkdtemp(join(tmpdir(), "reins-log-"));
     path = join(dir, "nested", "decisions.jsonl");
   });
 

@@ -1,14 +1,12 @@
-# Leash
+# Reins
 
 An execution layer for trading agents on Hyperliquid. Position limits, daily loss
 caps and a kill switch enforced **outside the model**, not in the prompt.
 
-Leash is not an exchange. It holds no liquidity, custodies no funds and matches no
-orders — Hyperliquid does all three. Leash sits in front of it, checks every order
+Reins is not an exchange. It holds no liquidity, custodies no funds and matches no
+orders — Hyperliquid does all three. Reins sits in front of it, checks every order
 an agent wants to place against limits the agent cannot change, and routes what
 survives. Revenue comes from Hyperliquid builder codes on the flow it routes.
-
-> Name is a placeholder.
 
 ## Why this exists
 
@@ -39,17 +37,17 @@ Early, but real. 153 tests, no network calls in any of them.
 | `src/mock-transport.ts` | In-memory API stand-in, so agents can be tested without a network |
 
 All of it works end to end. Going live is now a matter of funding an account and
-setting `LEASH_MODE=live` with a key.
+setting `REINS_MODE=live` with a key.
 
 ### Going live
 
 ```bash
-LEASH_MODE=live
-LEASH_NETWORK=testnet          # mainnet spends real money
-LEASH_PRIVATE_KEY=0x...        # omit to stay read-only
+REINS_MODE=live
+REINS_NETWORK=testnet          # mainnet spends real money
+REINS_PRIVATE_KEY=0x...        # omit to stay read-only
 ```
 
-Defaults are deliberately safe: `LEASH_MODE` is `paper` and `LEASH_NETWORK` is
+Defaults are deliberately safe: `REINS_MODE` is `paper` and `REINS_NETWORK` is
 `testnet`, so trading real funds takes two explicit changes rather than one
 forgotten variable. Live mode without a key stays read-only instead of failing
 at the first order, and mainnet prints a loud banner on startup.
@@ -77,7 +75,7 @@ jq -r 'select(.risk.allowed == false) | [.time, .risk.code, .reason] | @tsv' dec
 ```
 
 Each record holds the stated reason, the request, the account context at the
-time, the risk verdict, and the outcome. Set `LEASH_LOG_FILE` to persist it;
+time, the risk verdict, and the outcome. Set `REINS_LOG_FILE` to persist it;
 without it the log lives in memory and dies with the process.
 
 ### Two things to be clear about
@@ -96,7 +94,7 @@ safety mechanism; the log is observability.
 
 ## Paper trading
 
-`LEASH_MODE=paper` (the default) runs the same tools, the same risk engine and
+`REINS_MODE=paper` (the default) runs the same tools, the same risk engine and
 the same agent against **real prices with simulated fills**. Nothing is signed
 and nothing reaches the exchange.
 
@@ -134,14 +132,14 @@ estimate of it.**
 ```json
 {
   "env": {
-    "LEASH_MODE": "paper",
-    "LEASH_PAPER_BALANCE": "10000",
-    "LEASH_PAPER_FILE": "./paper-run.json"
+    "REINS_MODE": "paper",
+    "REINS_PAPER_BALANCE": "10000",
+    "REINS_PAPER_FILE": "./paper-run.json"
   }
 }
 ```
 
-Without `LEASH_PAPER_FILE` the account lives in memory and is lost on restart.
+Without `REINS_PAPER_FILE` the account lives in memory and is lost on restart.
 Set it for anything you intend to run for more than one session — writes go to a
 temp file and are renamed into place, so a crash cannot leave a half-written run
 behind.
@@ -181,26 +179,26 @@ Then point an MCP client at it:
 ```json
 {
   "mcpServers": {
-    "leash": {
+    "reins": {
       "command": "node",
       "args": ["/absolute/path/to/hyperliquid-agent/dist/bin/serve.js"],
       "env": {
-        "LEASH_NETWORK": "testnet",
-        "LEASH_SYMBOLS": "BTC,ETH",
-        "LEASH_MAX_POSITION_USD": "5000",
-        "LEASH_DAILY_LOSS_USD": "500",
-        "LEASH_MAX_LEVERAGE": "3",
-        "LEASH_MAX_ORDERS_PER_MIN": "12",
-        "LEASH_BUILDER_ADDRESS": "0xYOUR_BUILDER_ADDRESS",
-        "LEASH_BUILDER_FEE_TENTHS_BPS": "10",
-        "LEASH_LOG_FILE": "./decisions.jsonl"
+        "REINS_NETWORK": "testnet",
+        "REINS_SYMBOLS": "BTC,ETH",
+        "REINS_MAX_POSITION_USD": "5000",
+        "REINS_DAILY_LOSS_USD": "500",
+        "REINS_MAX_LEVERAGE": "3",
+        "REINS_MAX_ORDERS_PER_MIN": "12",
+        "REINS_BUILDER_ADDRESS": "0xYOUR_BUILDER_ADDRESS",
+        "REINS_BUILDER_FEE_TENTHS_BPS": "10",
+        "REINS_LOG_FILE": "./decisions.jsonl"
       }
     }
   }
 }
 ```
 
-`LEASH_SYMBOLS`, `LEASH_MAX_POSITION_USD` and `LEASH_DAILY_LOSS_USD` are
+`REINS_SYMBOLS`, `REINS_MAX_POSITION_USD` and `REINS_DAILY_LOSS_USD` are
 required — there is no default for "how much of your money may this thing lose".
 
 Until a signer is wired the server runs **read-only**: reads work, trading throws.

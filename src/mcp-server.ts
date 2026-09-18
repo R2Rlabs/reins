@@ -394,7 +394,7 @@ export const TOOL_NAMES = [
 ] as const;
 
 export function createMcpServer(deps: McpServerDeps): McpServer {
-  const server = new McpServer({ name: "leash-hyperliquid", version: "0.0.1" });
+  const server = new McpServer({ name: "reins", version: "0.0.1" });
 
   server.registerTool(
     "get_limits",
