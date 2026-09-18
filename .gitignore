@@ -5,3 +5,6 @@ dist/
 !.env.example
 *.log
 .DS_Store
+
+# Demo agent runs: paper account, decision log, API spend.
+demo-data/

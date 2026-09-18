@@ -52,6 +52,15 @@ export type Decision =
 
 const WINDOW_MS = 60_000;
 
+/**
+ * Money in refusal messages. A fixed locale and at most two decimals, so the
+ * agent and the published decision log read the same on every machine.
+ */
+function usd(value: number): string {
+  const amount = Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  return `${value < 0 ? "-" : ""}$${amount}`;
+}
+
 export class RiskEngine {
   private readonly limits: RiskLimits;
   private readonly now: () => number;
@@ -133,8 +142,8 @@ export class RiskEngine {
         allowed: false,
         code: "HALTED_DAILY_LOSS",
         reason:
-          `Daily loss limit of $${this.limits.dailyLossLimitUsd.toLocaleString()} ` +
-          `was hit (realised $${state.realizedPnlTodayUsd.toLocaleString()}). ` +
+          `Daily loss limit of ${usd(this.limits.dailyLossLimitUsd)} ` +
+          `was hit (realised ${usd(state.realizedPnlTodayUsd)}). ` +
           `Only reduce-only orders are accepted until the next UTC day.`,
       };
     }
@@ -145,8 +154,8 @@ export class RiskEngine {
         allowed: false,
         code: "POSITION_TOO_LARGE",
         reason:
-          `Would put ${order.symbol} at $${Math.abs(projected).toLocaleString()}, ` +
-          `over the $${this.limits.maxPositionUsd.toLocaleString()} cap.`,
+          `Would put ${order.symbol} at ${usd(Math.abs(projected))}, ` +
+          `over the ${usd(this.limits.maxPositionUsd)} cap.`,
       };
     }
 

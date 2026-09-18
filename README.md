@@ -17,7 +17,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 153 tests, no network calls in any of them.
+Early, but real. 184 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -35,6 +35,7 @@ Early, but real. 153 tests, no network calls in any of them.
 | `src/private-key-signer.ts` | A Signer backed by a private key |
 | `src/signer.ts` | The Signer interface plus a stub. See "On signing" below |
 | `src/mock-transport.ts` | In-memory API stand-in, so agents can be tested without a network |
+| `examples/demo-agent/` | Claude trading on paper through Reins, producing a publishable decision log |
 
 All of it works end to end. Going live is now a matter of funding an account and
 setting `REINS_MODE=live` with a key.
@@ -54,6 +55,17 @@ at the first order, and mainnet prints a loud banner on startup.
 
 The private key is only read in live mode — paper never signs anything, so it is
 never handed the means to.
+
+## See it run
+
+```bash
+npm run build
+npm run demo -- --scripted      # free: no API key, live prices, paper fills
+```
+
+With an Anthropic API key, `npm run demo` runs Claude as the agent under a hard
+spending cap. See [`examples/demo-agent`](examples/demo-agent/) for cost, limits and how
+to publish the result honestly.
 
 ## The decision log
 

@@ -171,3 +171,26 @@ describe("malformed input", () => {
     expect(decision).toMatchObject({ allowed: false, code: "INVALID_ORDER" });
   });
 });
+
+describe("refusal messages", () => {
+  it("shows money with at most two decimals, whatever the machine's locale", () => {
+    const engine = new RiskEngine(limits);
+    const state = { ...flat, positionsUsd: { BTC: 499.3071 } };
+    const decision = engine.check({ symbol: "BTC", side: "buy", sizeUsd: 50_000 }, state);
+    expect(decision).toEqual({
+      allowed: false,
+      code: "POSITION_TOO_LARGE",
+      reason: "Would put BTC at $50,499.31, over the $25,000 cap.",
+    });
+  });
+
+  it("writes a realised loss as a negative dollar amount", () => {
+    const engine = new RiskEngine(limits);
+    const decision = engine.check(
+      { symbol: "BTC", side: "buy", sizeUsd: 100 },
+      { ...flat, realizedPnlTodayUsd: -2_600 },
+    );
+    expect(decision.allowed).toBe(false);
+    if (!decision.allowed) expect(decision.reason).toContain("(realised -$2,600)");
+  });
+});
