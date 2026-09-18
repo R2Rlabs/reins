@@ -1,3 +1,4 @@
+import type { ApprovalRequest } from "./builder-approval.js";
 import type { Signer } from "./signer.js";
 import type { AccountState } from "./risk.js";
 import { formatPrice, formatSize } from "./format.js";
@@ -329,6 +330,33 @@ export class HyperliquidClient {
     const now = this.now();
     this.lastNonce = now > this.lastNonce ? now : this.lastNonce + 1;
     return this.lastNonce;
+  }
+
+  /**
+   * The largest builder fee `user` has approved for `builder`, in tenths of a
+   * basis point — the unit an order's `f` uses. 0 when nothing is approved.
+   */
+  async maxBuilderFee(user: string, builder: string): Promise<number> {
+    return this.postInfo<number>({
+      type: "maxBuilderFee",
+      user: user.toLowerCase(),
+      builder: builder.toLowerCase(),
+    });
+  }
+
+  /**
+   * Sends an ApproveBuilderFee the user already signed in their own wallet.
+   * This client's signer plays no part — the approval must come from the
+   * user's main wallet, which Reins never holds.
+   */
+  async submitBuilderApproval(
+    request: ApprovalRequest,
+  ): Promise<{ ok: true } | { ok: false; message: string }> {
+    const response = await this.post<{ status: "ok" } | { status: "err"; response: string }>(
+      "/exchange",
+      { ...request, vaultAddress: null },
+    );
+    return response.status === "ok" ? { ok: true } : { ok: false, message: response.response };
   }
 
   private async postExchange(

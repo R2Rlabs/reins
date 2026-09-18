@@ -17,7 +17,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 251 tests, no network calls in any of them.
+Early, but real. 281 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -29,9 +29,11 @@ Early, but real. 251 tests, no network calls in any of them.
 | `src/trading-client.ts` | The interface live and paper both satisfy |
 | `src/decision-log.ts` | Append-only record of every attempt and its stated reason |
 | `src/decision-log-file.ts` | JSON Lines log on disk |
-| `src/bin/cli.ts` | The `reins` command: `serve` (default) and `init` |
+| `src/bin/cli.ts` | The `reins` command: `serve` (default), `init` and `approve-builder` |
 | `src/bin/serve.ts` | stdio entry point |
 | `src/init.ts` | `reins init` — writes a paper-mode server entry into `.mcp.json` |
+| `src/approve-builder.ts` | `reins approve-builder` — the user approves the builder fee in their own wallet |
+| `src/builder-approval.ts` | The ApproveBuilderFee action: EIP-712 typed data, signature checks |
 | `src/format.ts` | Price and size formatting to Hyperliquid's tick and lot rules |
 | `src/signing.ts` | L1 action signing, verified against the Python SDK's vectors |
 | `src/private-key-signer.ts` | A Signer backed by a private key |
@@ -206,6 +208,29 @@ Hyperliquid's 10 bp cap). Before a live order can carry it, the user approves
 it once with `ApproveBuilderFee` from their main wallet, and the builder
 address must hold at least 100 USDC in its Hyperliquid perps account. Setting
 the constant to `""` stops `init` writing any builder code.
+
+### Approving the fee
+
+```bash
+node dist/bin/cli.js approve-builder              # `npx reins approve-builder` once published
+node dist/bin/cli.js approve-builder --check 0x…  # what a wallet has approved
+```
+
+The approval must be signed by the user's **main wallet**, so Reins never asks
+for that key. `approve-builder` serves a page on `127.0.0.1` behind a random
+path, the user's browser wallet (MetaMask or similar) signs the EIP-712
+approval there, and only the signature comes back. Reins checks that it names
+Reins' builder, the requested rate and network, a fresh nonce, and that it
+recovers to the wallet that says it signed — then sends it to Hyperliquid and
+reads the approval back with `maxBuilderFee`. Signing costs no gas.
+`--max-fee` approves a higher ceiling than the default 2 bp; `--network
+testnet` approves on testnet.
+
+The signing was checked against Hyperliquid itself: a throwaway key's
+approval, sent to testnet, was refused only for having no deposit, with the
+error naming exactly the throwaway address — so the signature recovered
+correctly, including when signed at Arbitrum's chain id as a browser wallet
+would.
 
 Or point an MCP client at it by hand:
 
