@@ -17,7 +17,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 184 tests, no network calls in any of them.
+Early, but real. 207 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -29,7 +29,9 @@ Early, but real. 184 tests, no network calls in any of them.
 | `src/trading-client.ts` | The interface live and paper both satisfy |
 | `src/decision-log.ts` | Append-only record of every attempt and its stated reason |
 | `src/decision-log-file.ts` | JSON Lines log on disk |
+| `src/bin/cli.ts` | The `reins` command: `serve` (default) and `init` |
 | `src/bin/serve.ts` | stdio entry point |
+| `src/init.ts` | `reins init` — writes a paper-mode server entry into `.mcp.json` |
 | `src/format.ts` | Price and size formatting to Hyperliquid's tick and lot rules |
 | `src/signing.ts` | L1 action signing, verified against the Python SDK's vectors |
 | `src/private-key-signer.ts` | A Signer backed by a private key |
@@ -184,9 +186,18 @@ fill an agent at an unbounded price.
 
 ```bash
 npm run build
+node dist/bin/cli.js init       # `npx reins init` once published
 ```
 
-Then point an MCP client at it:
+`init` adds a **paper-mode** `reins` server to `./.mcp.json` (keeping any other
+servers there) with the limits below: $5,000 max position, $500 daily loss,
+BTC and ETH, and absolute paths for the decision log and paper account. Change
+any of them with flags (`--symbols SOL,BTC --max-position 2500`), write
+elsewhere with `--file`, or `--print` the entry instead. It never writes live
+mode or a key, and refuses to replace an existing `reins` entry without
+`--force`. `reins init --help` lists everything.
+
+Or point an MCP client at it by hand:
 
 ```json
 {

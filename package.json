@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "bin": {
-    "reins": "./dist/bin/serve.js"
+    "reins": "./dist/bin/cli.js"
   },
   "scripts": {
     "test": "vitest run",
