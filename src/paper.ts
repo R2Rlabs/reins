@@ -347,8 +347,12 @@ export class PaperClient implements TradingClient {
       });
     }
 
+    // Gtc and Alo both rest whatever did not fill; only Ioc cancels it. An Alo
+    // reaching here did not cross, so it filled nothing and rests in full,
+    // which is the whole point of posting one.
+    const rests = tif !== "Ioc";
     const remainder = roundTo(wantSize - filled, asset.szDecimals);
-    if (remainder > 0 && tif === "Gtc") {
+    if (remainder > 0 && rests) {
       state.resting.push({
         oid,
         symbol: params.symbol,
@@ -363,7 +367,7 @@ export class PaperClient implements TradingClient {
     await this.persist();
 
     if (filled <= 0) {
-      return tif === "Gtc"
+      return rests
         ? { kind: "resting", oid }
         : { kind: "rejected", message: "No liquidity inside the limit price; Ioc cancelled." };
     }

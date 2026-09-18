@@ -326,6 +326,17 @@ describe("place_order", () => {
     expect(lastOrder(transport)["s"]).toBe("0.05");
   });
 
+  it("records the time in force it sent, explicit or defaulted", async () => {
+    const { deps } = setup();
+    const log = new MemoryDecisionLog();
+    const base = { symbol: "BTC", side: "buy" as const, reason: "r", sizeUsd: 1_000 };
+    await placeOrder({ ...deps, log }, { ...base, price: 99_000, tif: "Alo" });
+    await placeOrder({ ...deps, log }, { ...base, price: 99_000 });
+    await placeOrder({ ...deps, log }, base);
+
+    expect(log.records.map((r) => r.request["tif"])).toEqual(["Alo", "Gtc", "Ioc"]);
+  });
+
   it("refuses an order that breaches the position cap and sends nothing", async () => {
     const { deps, transport } = setup();
     const result = await placeOrder(deps, {

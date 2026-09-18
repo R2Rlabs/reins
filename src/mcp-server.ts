@@ -299,6 +299,9 @@ export function placeOrder(
     };
     if (args.reduceOnly !== undefined) request.reduceOnly = args.reduceOnly;
 
+    // Logged as sent: without it, a post-only order the market refused reads
+    // like an Ioc that found no liquidity.
+    const tif = args.tif ?? (marketable ? "Ioc" : "Gtc");
     const record = startRecord(deps, "place_order", args.reason, {
       symbol: args.symbol,
       side: args.side,
@@ -306,6 +309,7 @@ export function placeOrder(
       limitPrice: round(limitPrice, 6),
       marketable,
       reduceOnly: args.reduceOnly ?? false,
+      tif,
     });
     record.context = contextOf(state);
 
@@ -324,7 +328,7 @@ export function placeOrder(
         size: args.sizeUsd / limitPrice,
         price: limitPrice,
         reduceOnly: args.reduceOnly ?? false,
-        tif: args.tif ?? (marketable ? "Ioc" : "Gtc"),
+        tif,
       });
     } catch (error) {
       record.error = error instanceof Error ? error.message : String(error);
@@ -388,6 +392,7 @@ export function closePosition(
       side,
       sizeUsd: round(sizeUsd),
       limitPrice: round(limitPrice, 6),
+      tif: "Ioc",
     });
     record.context = contextOf(state);
 

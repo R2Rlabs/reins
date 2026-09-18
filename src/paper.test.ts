@@ -217,6 +217,33 @@ describe("marketable fills", () => {
     expect((await paper.snapshot()).fills).toHaveLength(0);
   });
 
+  it("rests a post-only order that does not cross, as the exchange would", async () => {
+    // The demo agent's first real order: a passive bid below the ask, sent
+    // Alo, was cancelled as if it were an Ioc.
+    const paper = client();
+    const outcome = await paper.placeOrder({
+      symbol: "BTC",
+      side: "buy",
+      size: 1,
+      price: 99_995,
+      tif: "Alo",
+    });
+    expect(outcome).toMatchObject({ kind: "resting" });
+    const state = await paper.snapshot();
+    expect(state.resting).toMatchObject([{ side: "buy", size: 1, price: 99_995 }]);
+    expect(state.fills).toHaveLength(0);
+  });
+
+  it("fills a rested post-only order as a maker once the market trades through it", async () => {
+    const paper = client();
+    await paper.placeOrder({ symbol: "BTC", side: "buy", size: 1, price: 99_995, tif: "Alo" });
+    market.current = book([[99_970, 5]], [[99_980, 5]]);
+    await paper.accountState();
+
+    const [fill] = (await paper.snapshot()).fills;
+    expect(fill).toMatchObject({ price: 99_995, liquidity: "maker" });
+  });
+
   it("rejects an Ioc that finds no liquidity", async () => {
     const paper = client();
     const outcome = await paper.placeOrder({
