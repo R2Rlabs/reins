@@ -1,0 +1,52 @@
+{
+  "v": 3,
+  "attachments": {},
+  "createdOnFiles": {
+    "at": "2026-09-17T20:35:55.537Z",
+    "v": 1
+  },
+  "title": "Leash — agent execution layer on Hyperliquid",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1280, "h": 1500, "title": "Landing page", "is_interactive": true },
+    "Dashboard.dc.html": { "x": 1360, "y": 0, "w": 1280, "h": 900, "title": "Dashboard", "is_interactive": true },
+    "AgentDetail.dc.html": { "x": 0, "y": 1620, "w": 1280, "h": 1040, "title": "Agent — risk limits", "is_interactive": true },
+    "Sandbox.dc.html": { "x": 1360, "y": 1620, "w": 1280, "h": 980, "title": "Sandbox — paper trading", "is_interactive": true },
+    "Quickstart.dc.html": { "x": 0, "y": 2780, "w": 1280, "h": 900, "title": "Developer quickstart", "is_interactive": true },
+    "DecisionLog.dc.html": { "x": 1360, "y": 2780, "w": 1280, "h": 980, "title": "Decision log", "is_interactive": true }
+  },
+  "order": [
+    "Main.dc.html",
+    "Dashboard.dc.html",
+    "AgentDetail.dc.html",
+    "Sandbox.dc.html",
+    "Quickstart.dc.html",
+    "DecisionLog.dc.html"
+  ],
+  "notes": {
+    "title": {
+      "kind": "title1",
+      "maxW": 2640,
+      "w": 240,
+      "x": 0,
+      "y": -300,
+      "text": "Leash — agent execution layer on Hyperliquid"
+    },
+    "placeholder": {
+      "color": "orange",
+      "w": 320,
+      "x": 2760,
+      "y": 0,
+      "text": "Updated to match what is actually built. Name, numbers and addresses are still placeholders. Screens are clickable — click through landing, quickstart, dashboard, agent, sandbox and the decision log."
+    },
+    "built": {
+      "color": "green",
+      "w": 320,
+      "x": 2760,
+      "y": 320,
+      "text": "The sandbox and decision log screens now reflect the real implementation, including what the fill simulation does not model."
+    }
+  },
+  "designSystems": []
+}

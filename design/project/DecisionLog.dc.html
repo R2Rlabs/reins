@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body { margin: 0; font-family: 'Space Grotesk', system-ui, sans-serif; background: #0C0F16; }
+a { color: #4ADE80; text-decoration: none; } a:hover { color: #86EFAC; }
+</style>
+</helmet>
+<div style="width: 1280px; height: 980px; box-sizing: border-box; background: #0C0F16; color: #E8EDF4; display: flex;">
+
+<div style="width: 224px; flex-shrink: 0; border-right: 1px solid #242D3B; display: flex; flex-direction: column; padding: 22px 16px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 26px;">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+<span style="font-size: 17px; font-weight: 700; letter-spacing: -0.02em;">Leash</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+<a href="Dashboard.dc.html" style="display: block; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">Overview</a>
+<a href="AgentDetail.dc.html" style="display: block; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">Agents</a>
+<a href="Sandbox.dc.html" style="display: block; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">Sandbox</a>
+<a href="DecisionLog.dc.html" style="display: block; padding: 11px 12px; border-radius: 8px; background: #1A212D; color: #E8EDF4; font-size: 15px;">Decision log</a>
+<a href="#billing" style="display: block; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">Billing</a>
+</div>
+<div style="padding: 14px 12px; border-top: 1px solid #242D3B; font-size: 12px; color: #6E7A8C; line-height: 1.6;">Append-only<br><span style="font-family: 'JetBrains Mono', monospace; color: #8B96A8;">decisions.jsonl</span></div>
+</div>
+
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column;">
+
+<div style="display: flex; align-items: center; padding: 20px 32px; border-bottom: 1px solid #242D3B;">
+<div style="flex-grow: 1;">
+<h1 style="margin: 0 0 3px; font-size: 22px; font-weight: 500; letter-spacing: -0.02em;">Decision log</h1>
+<p style="margin: 0; font-size: 13px; color: #6E7A8C;">Every action attempted, and what the agent said it was doing</p>
+</div>
+<div style="display: flex; gap: 10px;">
+<button type="button" style="padding: 10px 16px; border-radius: 8px; border: 1px solid #5A4318; background: #1C1608; color: #F0B429; font-family: inherit; font-size: 14px; min-height: 44px; cursor: pointer;">Refusals only</button>
+<button type="button" style="padding: 10px 16px; border-radius: 8px; border: 1px solid #2E3B4C; background: transparent; color: #E8EDF4; font-family: inherit; font-size: 14px; min-height: 44px; cursor: pointer;">Export</button>
+</div>
+</div>
+
+<div style="padding: 20px 32px 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px;">
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 16px 18px;">
+<p style="margin: 0 0 7px; font-size: 12px; color: #8B96A8;">Decisions, 7d</p>
+<p style="margin: 0; font-size: 22px; font-weight: 500;">318</p>
+</div>
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 16px 18px;">
+<p style="margin: 0 0 7px; font-size: 12px; color: #8B96A8;">Refused by limits</p>
+<p style="margin: 0; font-size: 22px; font-weight: 500; color: #F0B429;">7</p>
+</div>
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 16px 18px;">
+<p style="margin: 0 0 7px; font-size: 12px; color: #8B96A8;">Rejected by exchange</p>
+<p style="margin: 0; font-size: 22px; font-weight: 500;">2</p>
+</div>
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 16px 18px;">
+<p style="margin: 0 0 7px; font-size: 12px; color: #8B96A8;">Filled</p>
+<p style="margin: 0; font-size: 22px; font-weight: 500; color: #4ADE80;">309</p>
+</div>
+</div>
+
+<div style="padding: 20px 32px; display: flex; flex-direction: column; gap: 12px;">
+
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 18px 20px;">
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6E7A8C;">14:22:07</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #C3CCDA;">place_order</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">BTC buy $18,400</span>
+<span style="flex-grow: 1;"></span>
+<span style="padding: 3px 10px; border-radius: 6px; background: #14301F; color: #4ADE80; font-size: 12px;">Filled 0.18 @ 102,214</span>
+</div>
+<p style="margin: 0 0 12px; font-size: 14px; line-height: 1.7; color: #C3CCDA; font-style: italic;">"Funding has been negative for six consecutive hours while spot held above the 4h VWAP. Sizing at 74% of the position cap rather than full, because realised volatility is elevated."</p>
+<p style="margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6E7A8C;">account $13,109 · BTC $12,500 · today −$400 · limits passed</p>
+</div>
+
+<div style="background: #17131A; border: 1px solid #3D3212; border-radius: 12px; padding: 18px 20px;">
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6E7A8C;">03:41:55</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #C3CCDA;">place_order</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">BTC buy $61,400</span>
+<span style="flex-grow: 1;"></span>
+<span style="padding: 3px 10px; border-radius: 6px; background: #3D3212; color: #F0B429; font-size: 12px;">REFUSED · POSITION_TOO_LARGE</span>
+</div>
+<p style="margin: 0 0 12px; font-size: 14px; line-height: 1.7; color: #C3CCDA; font-style: italic;">"Breaking to new highs on heavy volume. Going maximum size to capture the move before it extends further."</p>
+<p style="margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8B6B1F;">would put BTC at $61,400, over the $25,000 cap · nothing sent to the exchange</p>
+</div>
+
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 18px 20px;">
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6E7A8C;">02:18:30</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #C3CCDA;">close_position</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">ETH sell $8,200</span>
+<span style="flex-grow: 1;"></span>
+<span style="padding: 3px 10px; border-radius: 6px; background: #14301F; color: #4ADE80; font-size: 12px;">Filled</span>
+</div>
+<p style="margin: 0 0 12px; font-size: 14px; line-height: 1.7; color: #C3CCDA; font-style: italic;">"Funding flipped positive and the basis I opened this for has closed. Thesis is done; taking it off rather than holding through the reset."</p>
+<p style="margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6E7A8C;">reduce-only · realised +$212 net of fees</p>
+</div>
+
+<div style="background: #17131A; border: 1px solid #3D3212; border-radius: 12px; padding: 18px 20px;">
+<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6E7A8C;">01:04:12</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #C3CCDA;">place_order</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 13px;">DOGE buy $2,000</span>
+<span style="flex-grow: 1;"></span>
+<span style="padding: 3px 10px; border-radius: 6px; background: #3D3212; color: #F0B429; font-size: 12px;">REFUSED · SYMBOL_NOT_ALLOWED</span>
+</div>
+<p style="margin: 0 0 12px; font-size: 14px; line-height: 1.7; color: #C3CCDA; font-style: italic;">"Saw a headline about a major exchange listing. Taking a small speculative position outside my usual pairs."</p>
+<p style="margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8B6B1F;">allowlist is BTC, ETH · nothing sent to the exchange</p>
+</div>
+
+</div>
+
+<div style="margin: 0 32px 20px; padding: 14px 18px; border-radius: 10px; border: 1px solid #242D3B; background: #0F1520;">
+<p style="margin: 0; font-size: 12px; line-height: 1.7; color: #8B96A8;">Reasons are the agent's own account of why it acted, captured at the moment it acted. Useful for debugging and audit — not proof of what actually drove the decision.</p>
+</div>
+
+</div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1280,"height":980}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

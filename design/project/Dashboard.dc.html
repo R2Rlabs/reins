@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body { margin: 0; font-family: 'Space Grotesk', system-ui, sans-serif; background: #0C0F16; }
+a { color: #4ADE80; text-decoration: none; } a:hover { color: #86EFAC; }
+</style>
+</helmet>
+<div style="width: 1280px; height: 900px; box-sizing: border-box; background: #0C0F16; color: #E8EDF4; display: flex;">
+
+<div style="width: 224px; flex-shrink: 0; border-right: 1px solid #242D3B; display: flex; flex-direction: column; padding: 22px 16px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 26px;">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+<span style="font-size: 17px; font-weight: 700; letter-spacing: -0.02em;">Leash</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+<a href="Dashboard.dc.html" style="display: flex; align-items: center; gap: 11px; padding: 11px 12px; border-radius: 8px; background: #1A212D; color: #E8EDF4; font-size: 15px;">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="8" rx="1.5"></rect><rect x="14" y="3" width="7" height="5" rx="1.5"></rect><rect x="14" y="11" width="7" height="10" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect></svg>
+Overview</a>
+<a href="AgentDetail.dc.html" style="display: flex; align-items: center; gap: 11px; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="13" rx="3"></rect><path d="M12 3v4"></path><circle cx="9" cy="13" r="1"></circle><circle cx="15" cy="13" r="1"></circle></svg>
+Agents</a>
+<a href="Sandbox.dc.html" style="display: flex; align-items: center; gap: 11px; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"></path><path d="M10 3v6l-5 9a2 2 0 001.7 3h10.6a2 2 0 001.7-3l-5-9V3"></path></svg>
+Sandbox</a>
+<a href="#logs" style="display: flex; align-items: center; gap: 11px; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z"></path><path d="M9 9h6"></path><path d="M9 13h6"></path><path d="M9 17h3"></path></svg>
+Order log</a>
+<a href="#billing" style="display: flex; align-items: center; gap: 11px; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2.5"></rect><path d="M3 10h18"></path></svg>
+Billing</a>
+</div>
+<div style="padding: 14px 12px; border-top: 1px solid #242D3B; display: flex; align-items: center; gap: 10px;">
+<span style="width: 30px; height: 30px; border-radius: 50%; background: #23372B; color: #4ADE80; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500;">SL</span>
+<div style="flex-grow: 1; min-width: 0;">
+<div style="font-size: 13px;">Main account</div>
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #6E7A8C; overflow: hidden; text-overflow: ellipsis;">0x7a3f…c4e1</div>
+</div>
+</div>
+</div>
+
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column;">
+
+<div style="display: flex; align-items: center; padding: 22px 32px; border-bottom: 1px solid #242D3B;">
+<div style="flex-grow: 1;">
+<h1 style="margin: 0 0 3px; font-size: 22px; font-weight: 500; letter-spacing: -0.02em;">Overview</h1>
+<p style="margin: 0; font-size: 13px; color: #6E7A8C;">Hyperliquid mainnet · builder code active</p>
+</div>
+<div style="display: flex; gap: 10px;">
+<button type="button" style="padding: 10px 16px; border-radius: 8px; border: 1px solid #2E3B4C; background: transparent; color: #E8EDF4; font-family: inherit; font-size: 14px; min-height: 44px; cursor: pointer;">Export fills</button>
+<button type="button" style="padding: 10px 16px; border-radius: 8px; border: none; background: #4ADE80; color: #06210F; font-family: inherit; font-size: 14px; font-weight: 500; min-height: 44px; cursor: pointer;">New agent</button>
+</div>
+</div>
+
+<div style="padding: 24px 32px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px;">
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 18px 20px;">
+<p style="margin: 0 0 8px; font-size: 13px; color: #8B96A8;">Routed volume, 30d</p>
+<p style="margin: 0; font-size: 28px; font-weight: 500; letter-spacing: -0.02em;">$48.2M</p>
+</div>
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 18px 20px;">
+<p style="margin: 0 0 8px; font-size: 13px; color: #8B96A8;">Builder fees earned</p>
+<p style="margin: 0; font-size: 28px; font-weight: 500; letter-spacing: -0.02em; color: #4ADE80;">$4,820</p>
+</div>
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 18px 20px;">
+<p style="margin: 0 0 8px; font-size: 13px; color: #8B96A8;">Agents live</p>
+<p style="margin: 0; font-size: 28px; font-weight: 500; letter-spacing: -0.02em;">12</p>
+</div>
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 18px 20px;">
+<p style="margin: 0 0 8px; font-size: 13px; color: #8B96A8;">Limit blocks today</p>
+<p style="margin: 0; font-size: 28px; font-weight: 500; letter-spacing: -0.02em; color: #F0B429;">7</p>
+</div>
+</div>
+
+<div style="margin: 6px 32px 0; background: #141A24; border: 1px solid #242D3B; border-radius: 12px; overflow: hidden;">
+<div style="display: flex; align-items: center; padding: 16px 22px; border-bottom: 1px solid #242D3B;">
+<h2 style="margin: 0; flex-grow: 1; font-size: 16px; font-weight: 500;">Agents</h2>
+<span style="display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: #8B96A8;">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"></path></svg>
+All limits enforced server-side</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 2.4fr 1.3fr 1.2fr 1.1fr 0.9fr; gap: 12px; padding: 12px 22px; border-bottom: 1px solid #242D3B; font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: #6E7A8C;">
+<span>Agent</span><span>Max position</span><span>24h volume</span><span>24h PnL</span><span style="text-align: right;">Status</span>
+</div>
+
+<div style="display: grid; grid-template-columns: 2.4fr 1.3fr 1.2fr 1.1fr 0.9fr; gap: 12px; padding: 15px 22px; border-bottom: 1px solid #1C242F; align-items: center;">
+<div>
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 14px;">momentum-btc</div>
+<div style="font-size: 12px; color: #6E7A8C; margin-top: 3px;">claude-opus-5 · 4 tools</div>
+</div>
+<span style="font-size: 14px; color: #C3CCDA;">$25,000</span>
+<span style="font-size: 14px;">$2.1M</span>
+<span style="font-size: 14px; color: #4ADE80;">+$1,840</span>
+<span style="text-align: right;"><span style="display: inline-block; padding: 4px 11px; border-radius: 6px; background: #14301F; color: #4ADE80; font-size: 12px;">Live</span></span>
+</div>
+
+<div style="display: grid; grid-template-columns: 2.4fr 1.3fr 1.2fr 1.1fr 0.9fr; gap: 12px; padding: 15px 22px; border-bottom: 1px solid #1C242F; align-items: center;">
+<div>
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 14px;">funding-arb</div>
+<div style="font-size: 12px; color: #6E7A8C; margin-top: 3px;">custom bot · REST</div>
+</div>
+<span style="font-size: 14px; color: #C3CCDA;">$100,000</span>
+<span style="font-size: 14px;">$8.4M</span>
+<span style="font-size: 14px; color: #4ADE80;">+$3,210</span>
+<span style="text-align: right;"><span style="display: inline-block; padding: 4px 11px; border-radius: 6px; background: #14301F; color: #4ADE80; font-size: 12px;">Live</span></span>
+</div>
+
+<div style="display: grid; grid-template-columns: 2.4fr 1.3fr 1.2fr 1.1fr 0.9fr; gap: 12px; padding: 15px 22px; border-bottom: 1px solid #1C242F; align-items: center;">
+<div>
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 14px;">news-reactor</div>
+<div style="font-size: 12px; color: #6E7A8C; margin-top: 3px;">claude-opus-5 · sandbox</div>
+</div>
+<span style="font-size: 14px; color: #C3CCDA;">$5,000</span>
+<span style="font-size: 14px; color: #6E7A8C;">—</span>
+<span style="font-size: 14px; color: #8B96A8;">+$96 sim</span>
+<span style="text-align: right;"><span style="display: inline-block; padding: 4px 11px; border-radius: 6px; background: #1B2A40; color: #7DA9F0; font-size: 12px;">Paper</span></span>
+</div>
+
+<div style="display: grid; grid-template-columns: 2.4fr 1.3fr 1.2fr 1.1fr 0.9fr; gap: 12px; padding: 15px 22px; align-items: center; background: #17131A;">
+<div>
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 14px;">mean-revert-eth</div>
+<div style="font-size: 12px; color: #F87171; margin-top: 3px;">daily loss limit hit at 03:41 UTC</div>
+</div>
+<span style="font-size: 14px; color: #C3CCDA;">$40,000</span>
+<span style="font-size: 14px;">$1.2M</span>
+<span style="font-size: 14px; color: #F87171;">−$2,500</span>
+<span style="text-align: right;"><span style="display: inline-block; padding: 4px 11px; border-radius: 6px; background: #3A1A1D; color: #F87171; font-size: 12px;">Halted</span></span>
+</div>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

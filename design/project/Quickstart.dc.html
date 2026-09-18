@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body { margin: 0; font-family: 'Space Grotesk', system-ui, sans-serif; background: #0C0F16; }
+a { color: #4ADE80; text-decoration: none; } a:hover { color: #86EFAC; }
+</style>
+</helmet>
+<div style="width: 1280px; height: 900px; box-sizing: border-box; background: #0C0F16; color: #E8EDF4; display: flex; flex-direction: column;">
+
+<div style="display: flex; align-items: center; gap: 40px; padding: 20px 56px; border-bottom: 1px solid #242D3B;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+<span style="font-size: 17px; font-weight: 700; letter-spacing: -0.02em;">Leash</span>
+<span style="font-size: 17px; color: #3B475A; margin: 0 4px;">/</span>
+<span style="font-size: 17px; color: #8B96A8;">Docs</span>
+</div>
+<span style="flex-grow: 1;"></span>
+<a href="Main.dc.html" style="font-size: 15px; color: #8B96A8;">Back to site</a>
+</div>
+
+<div style="flex-grow: 1; min-height: 0; padding: 30px 56px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 40px; align-content: start;">
+
+<div>
+<h1 style="margin: 0 0 8px; font-size: 30px; font-weight: 700; letter-spacing: -0.03em;">Quickstart</h1>
+<p style="margin: 0 0 26px; font-size: 15px; line-height: 1.65; color: #8B96A8;">Paper mode is the default. You will not spend anything until you deliberately change two settings.</p>
+
+<div style="display: flex; gap: 16px; margin-bottom: 22px;">
+<span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #1A212D; border: 1px solid #2E3B4C; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500;">1</span>
+<div style="flex-grow: 1; min-width: 0;">
+<h2 style="margin: 2px 0 10px; font-size: 16px; font-weight: 500;">Add it to your MCP client</h2>
+<div style="border-radius: 10px; background: #0F1520; border: 1px solid #242D3B; padding: 14px 16px; font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.75; color: #C3CCDA;">
+<div><span style="color: #7DA9F0;">"leash"</span>: {</div>
+<div>&nbsp;&nbsp;<span style="color: #7DA9F0;">"command"</span>: <span style="color: #4ADE80;">"node"</span>,</div>
+<div>&nbsp;&nbsp;<span style="color: #7DA9F0;">"args"</span>: [<span style="color: #4ADE80;">"dist/bin/serve.js"</span>],</div>
+<div>&nbsp;&nbsp;<span style="color: #7DA9F0;">"env"</span>: {</div>
+<div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #7DA9F0;">"LEASH_SYMBOLS"</span>: <span style="color: #4ADE80;">"BTC,ETH"</span>,</div>
+<div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #7DA9F0;">"LEASH_MAX_POSITION_USD"</span>: <span style="color: #4ADE80;">"5000"</span>,</div>
+<div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #7DA9F0;">"LEASH_DAILY_LOSS_USD"</span>: <span style="color: #4ADE80;">"500"</span>,</div>
+<div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: #7DA9F0;">"LEASH_LOG_FILE"</span>: <span style="color: #4ADE80;">"./decisions.jsonl"</span></div>
+<div>&nbsp;&nbsp;}</div>
+<div>}</div>
+</div>
+<p style="margin: 10px 0 0; font-size: 12.5px; line-height: 1.6; color: #6E7A8C;">The three limit variables are required. There is no default for how much of your money this may lose.</p>
+</div>
+</div>
+
+<div style="display: flex; gap: 16px;">
+<span style="width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%; background: #1A212D; border: 1px solid #2E3B4C; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500;">2</span>
+<div style="flex-grow: 1; min-width: 0;">
+<h2 style="margin: 2px 0 10px; font-size: 16px; font-weight: 500;">When you are ready for real money</h2>
+<div style="border-radius: 10px; background: #1C1608; border: 1px solid #3D3212; padding: 16px 18px;">
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.85; color: #F0B429; margin-bottom: 12px;">
+<div>LEASH_MODE=live</div>
+<div>LEASH_NETWORK=mainnet</div>
+<div>LEASH_PRIVATE_KEY=0x…</div>
+</div>
+<p style="margin: 0; font-size: 13px; line-height: 1.65; color: #C3CCDA;">Two deliberate changes, not one forgotten variable. Live without a key stays read-only rather than failing on your first order.</p>
+</div>
+</div>
+</div>
+
+</div>
+
+<div>
+<h2 style="margin: 0 0 6px; font-size: 16px; font-weight: 500;">Seven tools</h2>
+<p style="margin: 0 0 16px; font-size: 13px; line-height: 1.6; color: #8B96A8;">Everything that can move money is risk-checked and logged first.</p>
+
+<div style="border-radius: 12px; background: #141A24; border: 1px solid #242D3B; overflow: hidden;">
+
+<div style="padding: 11px 16px; border-bottom: 1px solid #1C242F;">
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #4ADE80;">place_order</div>
+<div style="font-size: 11.5px; color: #8B96A8; margin-top: 3px;">Sized in USD, with a required reason</div>
+</div>
+<div style="padding: 11px 16px; border-bottom: 1px solid #1C242F;">
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #4ADE80;">close_position</div>
+<div style="font-size: 11.5px; color: #8B96A8; margin-top: 3px;">Reduce-only, allowed even when halted</div>
+</div>
+<div style="padding: 11px 16px; border-bottom: 1px solid #1C242F;">
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #4ADE80;">cancel_order</div>
+<div style="font-size: 11.5px; color: #8B96A8; margin-top: 3px;">By exchange order id</div>
+</div>
+<div style="padding: 11px 16px; border-bottom: 1px solid #1C242F;">
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #7DA9F0;">get_limits</div>
+<div style="font-size: 11.5px; color: #8B96A8; margin-top: 3px;">Headroom, loss budget, halted state</div>
+</div>
+<div style="padding: 11px 16px; border-bottom: 1px solid #1C242F;">
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #7DA9F0;">get_positions</div>
+<div style="font-size: 11.5px; color: #8B96A8; margin-top: 3px;">Exposure, equity, today's realised PnL</div>
+</div>
+<div style="padding: 11px 16px; border-bottom: 1px solid #1C242F;">
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #7DA9F0;">get_book</div>
+<div style="font-size: 11.5px; color: #8B96A8; margin-top: 3px;">Depth, spread, nearest levels</div>
+</div>
+<div style="padding: 11px 16px;">
+<div style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #7DA9F0;">get_recent_decisions</div>
+<div style="font-size: 11.5px; color: #8B96A8; margin-top: 3px;">What it already did, after a restart</div>
+</div>
+
+</div>
+
+<div style="margin-top: 16px; padding: 14px 16px; border-radius: 10px; border: 1px solid #242D3B; background: #0F1520;">
+<p style="margin: 0; font-size: 12.5px; line-height: 1.7; color: #8B96A8;">There is deliberately no tool that changes the limits. The agent can read them; only you can set them.</p>
+</div>
+
+</div>
+
+</div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

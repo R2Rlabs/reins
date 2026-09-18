@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body { margin: 0; font-family: 'Space Grotesk', system-ui, sans-serif; background: #0C0F16; }
+a { color: #4ADE80; text-decoration: none; } a:hover { color: #86EFAC; }
+input[type="text"], input[type="number"] { font-family: 'JetBrains Mono', monospace; }
+</style>
+</helmet>
+<div style="width: 1280px; height: 1040px; box-sizing: border-box; background: #0C0F16; color: #E8EDF4; display: flex;">
+
+<div style="width: 224px; flex-shrink: 0; border-right: 1px solid #242D3B; display: flex; flex-direction: column; padding: 22px 16px;">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 26px;">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+<span style="font-size: 17px; font-weight: 700; letter-spacing: -0.02em;">Leash</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 3px; flex-grow: 1;">
+<a href="Dashboard.dc.html" style="display: block; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">Overview</a>
+<a href="AgentDetail.dc.html" style="display: block; padding: 11px 12px; border-radius: 8px; background: #1A212D; color: #E8EDF4; font-size: 15px;">Agents</a>
+<a href="Sandbox.dc.html" style="display: block; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">Sandbox</a>
+<a href="#logs" style="display: block; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">Order log</a>
+<a href="#billing" style="display: block; padding: 11px 12px; border-radius: 8px; color: #8B96A8; font-size: 15px;">Billing</a>
+</div>
+<div style="padding: 14px 12px; border-top: 1px solid #242D3B; font-size: 12px; color: #6E7A8C;">Builder code<br><span style="font-family: 'JetBrains Mono', monospace; color: #8B96A8;">1.0 bp · perps</span></div>
+</div>
+
+<div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column;">
+
+<div style="display: flex; align-items: center; padding: 20px 32px; border-bottom: 1px solid #242D3B;">
+<div style="flex-grow: 1;">
+<div style="display: flex; align-items: center; gap: 12px;">
+<h1 style="margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 500;">momentum-btc</h1>
+<span style="display: inline-block; padding: 4px 11px; border-radius: 6px; background: #14301F; color: #4ADE80; font-size: 12px;">Live</span>
+</div>
+<p style="margin: 5px 0 0; font-size: 13px; color: #6E7A8C;">claude-opus-5 · key <span style="font-family: 'JetBrains Mono', monospace;">lsh_a41…9f2</span> · created 14 days ago</p>
+</div>
+<div style="display: flex; gap: 10px;">
+<button type="button" style="padding: 10px 16px; border-radius: 8px; border: 1px solid #2E3B4C; background: transparent; color: #E8EDF4; font-family: inherit; font-size: 14px; min-height: 44px; cursor: pointer;">Pause</button>
+<button type="button" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; border: 1px solid #5A2327; background: #2A1416; color: #F87171; font-family: inherit; font-size: 14px; font-weight: 500; min-height: 44px; cursor: pointer;">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v8"></path><path d="M6.3 7.3a8 8 0 1011.4 0"></path></svg>
+Kill and flatten</button>
+</div>
+</div>
+
+<div style="flex-grow: 1; min-height: 0; padding: 24px 32px; display: grid; grid-template-columns: 1.15fr 1fr; gap: 20px; align-content: start;">
+
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 24px;">
+<h2 style="margin: 0 0 5px; font-size: 16px; font-weight: 500;">Risk limits</h2>
+<p style="margin: 0 0 22px; font-size: 13px; line-height: 1.6; color: #8B96A8;">Enforced at the execution layer. The agent is told these exist, but cannot change them.</p>
+
+<div style="display: flex; flex-direction: column; gap: 18px;">
+
+<div>
+<label for="maxpos" style="display: block; font-size: 13px; color: #C3CCDA; margin-bottom: 7px;">Max position size</label>
+<input id="maxpos" type="text" value="$25,000" style="width: 100%; box-sizing: border-box; padding: 11px 14px; min-height: 44px; border-radius: 8px; border: 1px solid #2E3B4C; background: #0F1520; color: #E8EDF4; font-size: 14px;">
+</div>
+
+<div>
+<label for="maxlev" style="display: block; font-size: 13px; color: #C3CCDA; margin-bottom: 7px;">Max leverage</label>
+<input id="maxlev" type="text" value="5x" style="width: 100%; box-sizing: border-box; padding: 11px 14px; min-height: 44px; border-radius: 8px; border: 1px solid #2E3B4C; background: #0F1520; color: #E8EDF4; font-size: 14px;">
+</div>
+
+<div>
+<label for="dailyloss" style="display: block; font-size: 13px; color: #C3CCDA; margin-bottom: 7px;">Daily loss limit — halts the agent</label>
+<input id="dailyloss" type="text" value="$2,500" style="width: 100%; box-sizing: border-box; padding: 11px 14px; min-height: 44px; border-radius: 8px; border: 1px solid #5A4318; background: #1C1608; color: #F0B429; font-size: 14px;">
+</div>
+
+<div>
+<label for="symbols" style="display: block; font-size: 13px; color: #C3CCDA; margin-bottom: 7px;">Symbol allowlist</label>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; min-height: 44px; box-sizing: border-box; border-radius: 8px; border: 1px solid #2E3B4C; background: #0F1520;">
+<span style="padding: 5px 11px; border-radius: 6px; background: #1E2836; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #C3CCDA;">BTC</span>
+<span style="padding: 5px 11px; border-radius: 6px; background: #1E2836; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #C3CCDA;">ETH</span>
+<span style="padding: 5px 11px; border-radius: 6px; background: #1E2836; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #C3CCDA;">SOL</span>
+<input id="symbols" type="text" value="" placeholder="add symbol" style="flex-grow: 1; min-width: 110px; padding: 5px; border: none; background: transparent; color: #E8EDF4; font-size: 13px;">
+</div>
+</div>
+
+<div>
+<label for="rate" style="display: block; font-size: 13px; color: #C3CCDA; margin-bottom: 7px;">Max orders per minute</label>
+<input id="rate" type="text" value="12" style="width: 100%; box-sizing: border-box; padding: 11px 14px; min-height: 44px; border-radius: 8px; border: 1px solid #2E3B4C; background: #0F1520; color: #E8EDF4; font-size: 14px;">
+</div>
+
+<div style="display: flex; align-items: flex-start; gap: 11px; padding: 14px; border-radius: 8px; background: #0F1520; border: 1px solid #242D3B;">
+<input id="confirm" type="checkbox" checked style="width: 17px; height: 17px; margin: 2px 0 0; accent-color: #4ADE80;">
+<label for="confirm" style="font-size: 13px; line-height: 1.6; color: #C3CCDA;">Require my approval for any order above 50% of max position size</label>
+</div>
+
+<button type="button" style="padding: 12px 18px; border-radius: 8px; border: none; background: #4ADE80; color: #06210F; font-family: inherit; font-size: 14px; font-weight: 500; min-height: 44px; cursor: pointer;">Save limits</button>
+
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 20px;">
+
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 22px 24px;">
+<h2 style="margin: 0 0 4px; font-size: 16px; font-weight: 500;">Blocked this week</h2>
+<p style="margin: 0 0 18px; font-size: 13px; color: #8B96A8;">Orders the agent tried to place and the layer refused.</p>
+
+<div style="display: flex; align-items: center; gap: 13px; padding: 13px 0; border-top: 1px solid #1C242F;">
+<span style="width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; background: #1C1608; display: flex; align-items: center; justify-content: center;">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F0B429" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5"></path><path d="M12 16.5v.01"></path><circle cx="12" cy="12" r="9"></circle></svg>
+</span>
+<div style="flex-grow: 1; min-width: 0;">
+<div style="font-size: 14px;">Position size exceeded</div>
+<div style="font-size: 12px; color: #6E7A8C; margin-top: 2px;">Tried $61,400 on BTC · capped at $25,000</div>
+</div>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6E7A8C;">4×</span>
+</div>
+
+<div style="display: flex; align-items: center; gap: 13px; padding: 13px 0; border-top: 1px solid #1C242F;">
+<span style="width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; background: #1C1608; display: flex; align-items: center; justify-content: center;">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F0B429" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 15.5l7-7"></path></svg>
+</span>
+<div style="flex-grow: 1; min-width: 0;">
+<div style="font-size: 14px;">Symbol not on allowlist</div>
+<div style="font-size: 12px; color: #6E7A8C; margin-top: 2px;">Tried to open DOGE after a news headline</div>
+</div>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6E7A8C;">2×</span>
+</div>
+
+<div style="display: flex; align-items: center; gap: 13px; padding: 13px 0; border-top: 1px solid #1C242F;">
+<span style="width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; background: #1C1608; display: flex; align-items: center; justify-content: center;">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F0B429" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+</span>
+<div style="flex-grow: 1; min-width: 0;">
+<div style="font-size: 14px;">Rate limit</div>
+<div style="font-size: 12px; color: #6E7A8C; margin-top: 2px;">38 orders in one minute during a wick</div>
+</div>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6E7A8C;">1×</span>
+</div>
+
+</div>
+
+<div style="flex-grow: 1; background: #141A24; border: 1px solid #242D3B; border-radius: 12px; padding: 22px 24px;">
+<h2 style="margin: 0 0 4px; font-size: 16px; font-weight: 500;">Last decision</h2>
+<p style="margin: 0 0 16px; font-size: 13px; color: #8B96A8;">Today 14:22 UTC</p>
+<div style="padding: 16px; border-radius: 10px; background: #0F1520; border: 1px solid #242D3B;">
+<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+<span style="padding: 4px 10px; border-radius: 6px; background: #14301F; color: #4ADE80; font-family: 'JetBrains Mono', monospace; font-size: 12px;">BUY</span>
+<span style="font-family: 'JetBrains Mono', monospace; font-size: 14px;">BTC · 0.18 · $18,400</span>
+<span style="flex-grow: 1;"></span>
+<span style="font-size: 12px; color: #4ADE80;">Filled</span>
+</div>
+<p style="margin: 0; font-size: 13px; line-height: 1.7; color: #C3CCDA; font-style: italic;">"Funding has been negative for six consecutive hours while spot held above the 4h VWAP. Sizing at 74% of the position cap rather than full, because realised volatility is elevated."</p>
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1280,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

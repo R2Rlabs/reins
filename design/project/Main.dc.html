@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+body { margin: 0; font-family: 'Space Grotesk', system-ui, sans-serif; background: #0C0F16; }
+a { color: #4ADE80; text-decoration: none; } a:hover { color: #86EFAC; }
+</style>
+</helmet>
+<div style="width: 1280px; height: 1500px; box-sizing: border-box; background: #0C0F16; color: #E8EDF4; display: flex; flex-direction: column;">
+
+<div style="display: flex; align-items: center; gap: 40px; padding: 24px 64px; border-bottom: 1px solid #242D3B;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+<span style="font-size: 19px; font-weight: 700; letter-spacing: -0.02em;">Leash</span>
+</div>
+<div style="flex-grow: 1; display: flex; gap: 28px; font-size: 15px; color: #8B96A8;">
+<a href="Quickstart.dc.html" style="color: #8B96A8;">Docs</a>
+<a href="Sandbox.dc.html" style="color: #8B96A8;">Sandbox</a>
+<a href="DecisionLog.dc.html" style="color: #8B96A8;">Decision log</a>
+<a href="#github" style="color: #8B96A8;">GitHub</a>
+</div>
+<a href="Dashboard.dc.html" style="display: inline-block; padding: 10px 20px; border-radius: 8px; background: #4ADE80; color: #06210F; font-size: 15px; font-weight: 500; min-height: 44px; box-sizing: border-box; line-height: 24px;">Get started</a>
+</div>
+
+<div style="padding: 88px 64px 0; display: flex; flex-direction: column; align-items: center; text-align: center;">
+<div style="display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border: 1px solid #2A3646; border-radius: 999px; font-size: 13px; color: #8B96A8; margin-bottom: 32px;">
+<span style="width: 7px; height: 7px; border-radius: 50%; background: #4ADE80; display: inline-block;"></span>
+Non-custodial. Your funds never leave your Hyperliquid account.
+</div>
+<h1 style="margin: 0 0 24px; font-size: 68px; line-height: 1.05; font-weight: 700; letter-spacing: -0.035em; max-width: 900px;">Let your agent trade.<br>Keep the brakes.</h1>
+<p style="margin: 0 0 40px; font-size: 20px; line-height: 1.55; color: #8B96A8; max-width: 660px;">An execution layer for trading agents on Hyperliquid. Position limits, loss caps and a kill switch enforced outside the model — not in the prompt. Paper trade first, and keep a record of every decision.</p>
+<div style="display: flex; gap: 14px;">
+<a href="Quickstart.dc.html" style="display: inline-block; padding: 14px 26px; border-radius: 10px; background: #4ADE80; color: #06210F; font-size: 16px; font-weight: 500; min-height: 44px; box-sizing: border-box;">Install the MCP server</a>
+<a href="DecisionLog.dc.html" style="display: inline-block; padding: 14px 26px; border-radius: 10px; border: 1px solid #2E3B4C; color: #E8EDF4; font-size: 16px; font-weight: 500; min-height: 44px; box-sizing: border-box;">See what an agent did</a>
+</div>
+</div>
+
+<div style="padding: 64px 64px 0; display: flex; justify-content: center;">
+<div style="width: 780px; background: #141A24; border: 1px solid #242D3B; border-radius: 14px; overflow: hidden;">
+<div style="display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-bottom: 1px solid #242D3B;">
+<span style="width: 11px; height: 11px; border-radius: 50%; background: #2E3B4C; display: inline-block;"></span>
+<span style="width: 11px; height: 11px; border-radius: 50%; background: #2E3B4C; display: inline-block;"></span>
+<span style="width: 11px; height: 11px; border-radius: 50%; background: #2E3B4C; display: inline-block;"></span>
+<span style="margin-left: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #6E7A8C;">terminal</span>
+</div>
+<div style="padding: 20px 24px; font-family: 'JetBrains Mono', monospace; font-size: 13.5px; line-height: 1.95; color: #C3CCDA;">
+<div><span style="color: #6E7A8C;">$</span> npx @leash/hyperliquid init</div>
+<div style="color: #4ADE80;">✓ Paper mode — live prices, simulated fills, no capital at risk</div>
+<div style="color: #4ADE80;">✓ Limits — max position $5,000 · daily loss $500 · BTC, ETH</div>
+<div style="color: #4ADE80;">✓ Decision log — ./decisions.jsonl</div>
+<div><span style="color: #F0B429;">→</span> 7 tools on stdio. Point your agent at it.</div>
+</div>
+</div>
+</div>
+
+<div style="padding: 72px 64px 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px;">
+
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 14px; padding: 28px;">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+<h2 style="margin: 18px 0 10px; font-size: 19px; font-weight: 500; letter-spacing: -0.01em;">Limits that actually hold</h2>
+<p style="margin: 0; font-size: 15px; line-height: 1.65; color: #8B96A8;">Position size, leverage, daily loss and a symbol allowlist, checked before anything reaches the exchange. There is no tool that changes them, so the model cannot talk its way past them.</p>
+</div>
+
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 14px; padding: 28px;">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F0B429" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"></path><path d="M10 3v6l-5 9a2 2 0 001.7 3h10.6a2 2 0 001.7-3l-5-9V3"></path></svg>
+<h2 style="margin: 18px 0 10px; font-size: 19px; font-weight: 500; letter-spacing: -0.01em;">Paper trade on real prices</h2>
+<p style="margin: 0; font-size: 15px; line-height: 1.65; color: #8B96A8;">Orders walk real book depth and pay real fees, so the curve is honest about slippage. Same tools, same limits, same agent — the only difference is that the fills are simulated.</p>
+</div>
+
+<div style="background: #141A24; border: 1px solid #242D3B; border-radius: 14px; padding: 28px;">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7DA9F0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14v16H5z"></path><path d="M9 9h6"></path><path d="M9 13h6"></path><path d="M9 17h3"></path></svg>
+<h2 style="margin: 18px 0 10px; font-size: 19px; font-weight: 500; letter-spacing: -0.01em;">Every decision on the record</h2>
+<p style="margin: 0; font-size: 15px; line-height: 1.65; color: #8B96A8;">Each order is stored with the reason the agent gave for it — including the ones the limits refused. When something strange happens at 3am, you can read exactly what it thought it was doing.</p>
+</div>
+
+</div>
+
+<div style="margin: 72px 64px 0; padding: 32px 40px; border: 1px solid #242D3B; border-radius: 14px; display: flex; align-items: center; gap: 48px;">
+<div style="flex-grow: 1;">
+<p style="margin: 0 0 6px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: #6E7A8C;">Why Hyperliquid</p>
+<p style="margin: 0; font-size: 16px; line-height: 1.6; color: #C3CCDA;">Hyperliquid has paid third-party builders over $40M through builder codes, and roughly 40% of its daily active traders arrive through apps like this one. Leash routes your agent's orders there and never touches your funds.</p>
+</div>
+<a href="Quickstart.dc.html" style="display: inline-block; padding: 12px 22px; border-radius: 10px; border: 1px solid #2E3B4C; color: #E8EDF4; font-size: 15px; font-weight: 500; white-space: nowrap; min-height: 44px; box-sizing: border-box;">How it works</a>
+</div>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1280,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
