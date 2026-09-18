@@ -17,7 +17,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 240 tests, no network calls in any of them.
+Early, but real. 251 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -197,6 +197,14 @@ any of them with flags (`--symbols SOL,BTC --max-position 2500`), write
 elsewhere with `--file`, or `--print` the entry instead. It never writes live
 mode or a key, and refuses to replace an existing `reins` entry without
 `--force`. `reins init --help` lists everything.
+
+`init` also adds Reins' builder code by default: **2 bp on live orders**, paid
+to `REINS_BUILDER_ADDRESS` in `src/init.ts`. It says so when it runs, paper
+results include the fee so they match what live would cost, and
+`--no-builder-fee` leaves it out (`--builder-fee 2` sets another rate, up to
+Hyperliquid's 10 bp cap). Before a live order can carry it, the user approves
+it once with `ApproveBuilderFee` from their main wallet. Until that constant
+holds a funded address, `init` writes no builder code at all.
 
 Or point an MCP client at it by hand:
 

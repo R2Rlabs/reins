@@ -1,9 +1,11 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_BUILDER_FEE_TENTHS_BPS,
   launchCommand,
   mergeConfig,
   parseInitArgs,
+  REINS_BUILDER_ADDRESS,
   runInit,
   serverEntry,
   type InitDeps,
@@ -60,6 +62,52 @@ describe("parseInitArgs", () => {
   it("rejects unknown flags rather than ignoring them", () => {
     expect(() => parseInitArgs(["--mode", "live"])).toThrow();
     expect(() => parseInitArgs(["--private-key", "0xabc"])).toThrow();
+  });
+});
+
+describe("the builder fee", () => {
+  const address = "0x1111111111111111111111111111111111111111";
+
+  it("is only ever empty or a well-formed address", () => {
+    // Guards the day the constant is filled in by hand.
+    expect(REINS_BUILDER_ADDRESS === "" || /^0x[0-9a-fA-F]{40}$/.test(REINS_BUILDER_ADDRESS)).toBe(true);
+  });
+
+  it("defaults to 2 bp, in tenths as Hyperliquid wants it", () => {
+    expect(parseInitArgs([]).builderFeeTenthsBps).toBe(20);
+    expect(DEFAULT_BUILDER_FEE_TENTHS_BPS).toBe(20);
+  });
+
+  it("takes a fee in basis points, down to 0.1 bp", () => {
+    expect(parseInitArgs(["--builder-fee", "2.5"]).builderFeeTenthsBps).toBe(25);
+    expect(parseInitArgs(["--builder-fee", "1.1"]).builderFeeTenthsBps).toBe(11);
+    expect(parseInitArgs(["--builder-fee", "10"]).builderFeeTenthsBps).toBe(100);
+  });
+
+  it.each([
+    [["--builder-fee", "10.5"], /at most 10 bp/],
+    [["--builder-fee", "1.25"], /steps of 0.1 bp/],
+    [["--builder-fee", "0"], /positive number/],
+    [["--builder-fee", "2", "--no-builder-fee"], /contradict/],
+  ])("rejects %j", (argv, message) => {
+    expect(() => parseInitArgs(argv)).toThrow(message);
+  });
+
+  it("goes into the entry when there is an address to pay", () => {
+    const entry = serverEntry(parseInitArgs([]), node, cwd, address);
+    expect(entry.env).toMatchObject({
+      REINS_BUILDER_ADDRESS: address,
+      REINS_BUILDER_FEE_TENTHS_BPS: "20",
+    });
+  });
+
+  it("is left out with --no-builder-fee, or while there is no address", () => {
+    const optedOut = serverEntry(parseInitArgs(["--no-builder-fee"]), node, cwd, address);
+    const noAddress = serverEntry(parseInitArgs([]), node, cwd, "");
+    for (const entry of [optedOut, noAddress]) {
+      expect(entry.env).not.toHaveProperty("REINS_BUILDER_ADDRESS");
+      expect(entry.env).not.toHaveProperty("REINS_BUILDER_FEE_TENTHS_BPS");
+    }
   });
 });
 
@@ -176,6 +224,19 @@ describe("runInit", () => {
     const { deps, files } = fakeDeps({ [path]: before });
     await expect(runInit([], deps)).rejects.toThrow(/--force/);
     expect(files[path]).toBe(before);
+  });
+
+  it("says when a builder fee is on and how to remove it", async () => {
+    const { deps, output } = fakeDeps();
+    await runInit(["--builder-fee", "2"], { ...deps, builderAddress: "0x2222222222222222222222222222222222222222" });
+    expect(output()).toContain("✓ Builder fee — 2 bp to Reins on live orders; paper results include it");
+    expect(output()).toContain("--no-builder-fee");
+  });
+
+  it("says nothing about a fee when none is charged", async () => {
+    const { deps, output } = fakeDeps();
+    await runInit([], { ...deps, builderAddress: "" });
+    expect(output()).not.toContain("Builder fee");
   });
 
   it("--print writes no file", async () => {
