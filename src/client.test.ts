@@ -302,6 +302,52 @@ describe("signing and nonces", () => {
   });
 });
 
+describe("API wallets", () => {
+  // The account that approved the API wallet; the StubSigner is the API wallet.
+  const ACCOUNT = "0xAbCdEf0000000000000000000000000000001234";
+
+  it("reads account data under the account, not the API wallet", async () => {
+    transport
+      .reply("info:clearinghouseState", STATE)
+      .reply("info:userFills", [])
+      .reply("info:frontendOpenOrders", []);
+    const c = client({ account: ACCOUNT });
+    await c.accountState();
+    await c.stopLosses();
+    await c.openPositions();
+
+    const users = ["info:clearinghouseState", "info:userFills", "info:frontendOpenOrders"].flatMap((route) =>
+      transport.callsTo(route as `info:${string}`).map((call) => call.body["user"]),
+    );
+    expect(users.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(users)).toEqual(new Set([ACCOUNT.toLowerCase()]));
+  });
+
+  it("still signs with the API wallet, with no vault address", async () => {
+    transport.reply("exchange:order", RESTING);
+    await client({ account: ACCOUNT }).placeOrder({ symbol: "BTC", side: "buy", size: 0.1, price: 50_000 });
+    const call = transport.callsTo("exchange:order")[0]!;
+    expect(call.body["vaultAddress"]).toBeNull();
+    expect(call.body["signature"]).toMatchObject({ r: expect.stringMatching(/^0x/) });
+  });
+
+  it("falls back to the signer's own address when no account is set", () => {
+    expect(client().accountAddress).toBe(signer.address);
+    expect(client({ account: ACCOUNT }).accountAddress).toBe(ACCOUNT.toLowerCase());
+  });
+
+  it("reads an account with no key at all, read-only", async () => {
+    transport.reply("info:clearinghouseState", STATE);
+    const readOnly = new HyperliquidClient({ fetch: transport.fetch, account: ACCOUNT });
+    expect(readOnly.isReadOnly).toBe(true);
+    expect(await readOnly.openPositions()).toHaveProperty("BTC");
+  });
+
+  it("refuses an account that is not an address", () => {
+    expect(() => client({ account: "0x1234" })).toThrow(/40 hex digits/);
+  });
+});
+
 describe("account state", () => {
   it("caches the universe instead of refetching it", async () => {
     transport.reply("exchange:order", RESTING);

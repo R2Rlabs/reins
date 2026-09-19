@@ -86,10 +86,15 @@ async function main(): Promise<void> {
   const signer =
     mode === "live" && privateKey ? new PrivateKeySigner(privateKey) : undefined;
 
+  // The account being traded. With an API wallet's key in REINS_PRIVATE_KEY,
+  // this is the account that approved it; account data is read from here.
+  const account = mode === "live" ? process.env["REINS_ACCOUNT_ADDRESS"] || undefined : undefined;
+
   const market = new HyperliquidClient({
     network,
     ...(builder ? { builder } : {}),
     ...(signer ? { signer } : {}),
+    ...(account ? { account } : {}),
   });
 
   let client: TradingClient;
@@ -114,12 +119,18 @@ async function main(): Promise<void> {
       network === "mainnet"
         ? "  *** REAL FUNDS ON MAINNET — orders placed here spend actual money ***\n"
         : "";
-    banner =
-      `live — signing as ${signer.address}\n` + warning;
+    const apiWallet = account !== undefined && account.toLowerCase() !== signer.address;
+    banner = apiWallet
+      ? `live — API wallet ${signer.address} trading for account ${account!.toLowerCase()}\n` + warning
+      : `live — signing as ${signer.address} with the account's own key\n` +
+        warning +
+        "  An API wallet is safer: it can trade but not withdraw. Create one on\n" +
+        "  Hyperliquid, put its key in REINS_PRIVATE_KEY, and set REINS_ACCOUNT_ADDRESS.\n";
   } else {
     client = market;
-    banner =
-      `live — READ-ONLY: set REINS_PRIVATE_KEY to trade. Reads work; orders throw\n`;
+    banner = account
+      ? `live — READ-ONLY for account ${account.toLowerCase()}: set REINS_PRIVATE_KEY to trade\n`
+      : `live — READ-ONLY: set REINS_PRIVATE_KEY to trade. Reads work; orders throw\n`;
   }
 
   const logFile = process.env["REINS_LOG_FILE"];

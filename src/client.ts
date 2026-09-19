@@ -56,6 +56,14 @@ export interface ClientOptions {
   network?: Network;
   /** Omit for a read-only client: market data works, nothing can trade. */
   signer?: Signer;
+  /**
+   * The account traded, when the signer is an API wallet rather than the
+   * account's own key. Hyperliquid's API wallets trade for an account but
+   * cannot withdraw from it, so they are what a bot should hold. Account data
+   * lives under the account's address, not the API wallet's: queried under the
+   * API wallet, the account looks empty. Defaults to the signer's address.
+   */
+  account?: string;
   builder?: BuilderConfig;
   fetch?: FetchLike;
   now?: () => number;
@@ -102,6 +110,7 @@ export class HyperliquidClient {
   readonly network: Network;
   private readonly baseUrl: string;
   private readonly signer: Signer | undefined;
+  private readonly account: string | undefined;
   private readonly builder: BuilderConfig | undefined;
   private readonly doFetch: FetchLike;
   private readonly now: () => number;
@@ -113,6 +122,10 @@ export class HyperliquidClient {
     this.network = options.network ?? "testnet";
     this.baseUrl = API_URLS[this.network];
     this.signer = options.signer;
+    if (options.account !== undefined && !/^0x[0-9a-fA-F]{40}$/.test(options.account)) {
+      throw new Error(`account must be a 0x address of 40 hex digits, got "${options.account}".`);
+    }
+    this.account = options.account?.toLowerCase();
     this.doFetch = options.fetch ?? (globalThis.fetch as unknown as FetchLike);
     this.now = options.now ?? Date.now;
 
@@ -132,6 +145,11 @@ export class HyperliquidClient {
       // Hyperliquid rejects mixed-case addresses in signed payloads.
       this.builder = { address: address.toLowerCase(), feeTenthsBps };
     }
+  }
+
+  /** Whose account data is read: the configured account, else the signer's own. */
+  get accountAddress(): string | undefined {
+    return this.account ?? this.signer?.address;
   }
 
   /** True when no signer was supplied: market data works, trading does not. */
@@ -167,9 +185,9 @@ export class HyperliquidClient {
   }
 
   async clearinghouseState(user?: string): Promise<ClearinghouseState> {
-    const address = user ?? this.signer?.address;
+    const address = user ?? this.accountAddress;
     if (!address) {
-      throw new Error("No user address given, and this client has no signer.");
+      throw new Error("No user address given, and this client has neither an account nor a signer.");
     }
     return this.postInfo<ClearinghouseState>({
       type: "clearinghouseState",
@@ -232,9 +250,9 @@ export class HyperliquidClient {
   }
 
   async userFills(user?: string): Promise<Fill[]> {
-    const address = user ?? this.signer?.address;
+    const address = user ?? this.accountAddress;
     if (!address) {
-      throw new Error("No user address given, and this client has no signer.");
+      throw new Error("No user address given, and this client has neither an account nor a signer.");
     }
     return this.postInfo<Fill[]>({
       type: "userFills",
@@ -363,7 +381,7 @@ export class HyperliquidClient {
 
   /** Open stop-loss orders, read from the exchange. */
   async stopLosses(user?: string): Promise<StopLoss[]> {
-    const address = user ?? this.signer?.address;
+    const address = user ?? this.accountAddress;
     if (!address) return [];
     const orders = await this.postInfo<FrontendOpenOrder[]>({
       type: "frontendOpenOrders",

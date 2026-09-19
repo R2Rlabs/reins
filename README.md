@@ -17,7 +17,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 317 tests, no network calls in any of them.
+Early, but real. 322 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -49,8 +49,19 @@ setting `REINS_MODE=live` with a key.
 ```bash
 REINS_MODE=live
 REINS_NETWORK=testnet          # mainnet spends real money
-REINS_PRIVATE_KEY=0x...        # omit to stay read-only
+REINS_ACCOUNT_ADDRESS=0x...    # your Hyperliquid account
+REINS_PRIVATE_KEY=0x...        # an API wallet's key, not your account's; omit to stay read-only
 ```
+
+**Use an API wallet, not your account's own key.** Hyperliquid lets an account
+approve API wallets that can trade for it but cannot withdraw from it — create
+one on Hyperliquid's API page, signing the approval with your main wallet. Put
+its key in `REINS_PRIVATE_KEY` and your account's address in
+`REINS_ACCOUNT_ADDRESS`: orders are signed by the API wallet, while positions,
+fills and stops are read from the account, because under the API wallet's own
+address the account looks empty. The startup banner names both. Hyperliquid
+prunes API wallets that expire or are replaced; make a fresh one rather than
+reusing an old address.
 
 Defaults are deliberately safe: `REINS_MODE` is `paper` and `REINS_NETWORK` is
 `testnet`, so trading real funds takes two explicit changes rather than one
