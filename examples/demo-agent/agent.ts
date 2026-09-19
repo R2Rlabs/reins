@@ -5,7 +5,7 @@
  *   npm run build                         # the demo drives the built server
  *   npm run demo -- --scripted            # free wiring check, no API key
  *   ANTHROPIC_API_KEY=... npm run demo -- --once
- *   ANTHROPIC_API_KEY=... npm run demo    # a cycle every 30 min until the budget runs out
+ *   ANTHROPIC_API_KEY=... npm run demo    # a cycle every hour until the budget runs out
  *   npm run demo:report                   # a postable summary of the run so far
  */
 import { existsSync } from "node:fs";
@@ -62,7 +62,7 @@ Options:
   --scripted              Replay a fixed script instead of calling Claude. Free; no key.
   --once                  Run a single decision cycle, then exit.
   --cycles <n>            Stop after n cycles.
-  --interval-minutes <n>  Minutes between cycles (default 30).
+  --interval-minutes <n>  Minutes between cycles (default 60).
   --budget-usd <n>        Hard cap on Claude API spend, across all runs (default 5).
   --reset-spend           Zero the spend counter before starting.
   --model <id>            ${DEMO_MODELS.join(" | ")} (default claude-opus-5).
@@ -101,7 +101,7 @@ async function main(): Promise<void> {
       scripted: { type: "boolean", default: false },
       once: { type: "boolean", default: false },
       cycles: { type: "string" },
-      "interval-minutes": { type: "string", default: "30" },
+      "interval-minutes": { type: "string", default: "60" },
       "budget-usd": { type: "string", default: "5" },
       "reset-spend": { type: "boolean", default: false },
       model: { type: "string", default: "claude-opus-5" },

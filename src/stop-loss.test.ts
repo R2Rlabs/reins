@@ -119,12 +119,45 @@ describe("place_order with stopLoss", () => {
     expect(log.records[1]!.reason).toMatch(/^Stop for order \d+: Breakout held\.$/);
   });
 
-  it("refuses a stopLoss on a resting order or on the wrong side, sending nothing", async () => {
+  it("refuses a stopLoss on the wrong side of the entry, sending nothing", async () => {
     const d = deps();
-    expect(text(await placeOrder(d, { ...buy, price: 2640, stopLoss: 2630 }))).toMatch(/set_stop_loss once it has filled/);
     expect(text(await placeOrder(d, { ...buy, stopLoss: 2650 }))).toMatch(/goes below the entry/);
+    expect(text(await placeOrder(d, { ...buy, price: 2640, stopLoss: 2645 }))).toMatch(/goes below the entry/);
     expect((await paper.snapshot()).fills).toHaveLength(0);
     expect(log.records).toHaveLength(0);
+  });
+
+  it("sends a resting order's stop with it, placed the moment it fills", async () => {
+    const d = deps();
+    const body = parse(await placeOrder(d, { ...buy, price: 2640, stopLoss: 2630 }));
+    expect(body).toMatchObject({ kind: "resting", stopLoss: { triggerPrice: 2630 } });
+    expect(await paper.stopLosses()).toEqual([]); // nothing to protect yet
+
+    const fill = START + 2 * MINUTE;
+    market.candleData = [minute(fill, 2641, 2639, 2642)];
+    clock.ms = START + 5 * MINUTE;
+    const positions = parse(await getPositions(d));
+
+    expect(positions["positionsUsd"]).toHaveProperty("ETH");
+    expect(positions["stopLosses"]).toMatchObject([{ side: "sell", size: 0.7576, triggerPrice: 2630 }]);
+    expect(positions["unprotected"]).toEqual([]);
+    expect(log.records.map((r) => r.tool)).toEqual(["place_order"]);
+  });
+
+  it("fires a resting entry's stop in the same minute it filled, if that minute went through it", async () => {
+    await placeOrder(deps(), { ...buy, price: 2640, stopLoss: 2630 });
+    const minuteOfBoth = START + 2 * MINUTE;
+    market.candleData = [minute(minuteOfBoth, 2641, 2628, 2642)];
+    clock.ms = START + 5 * MINUTE;
+    await paper.accountState(); // the entry fills
+    await paper.accountState(); // its stop, now watching, sees the same minute
+
+    const state = await paper.snapshot();
+    expect(state.positions).toEqual({});
+    expect(state.fills.map((f) => [f.side, f.price, f.time])).toEqual([
+      ["buy", 2640, minuteOfBoth],
+      ["sell", 2630, minuteOfBoth],
+    ]);
   });
 });
 
@@ -227,18 +260,28 @@ describe("requireStopLoss", () => {
     expect(log.records[0]!.risk).toMatchObject({ allowed: false, code: "NO_STOP_LOSS" });
   });
 
-  it("blocks new risk after a resting entry fills bare, until a stop is set", async () => {
+  it("refuses a resting entry without a stop too, so no fill is ever bare", async () => {
     const d = deps(true);
-    parse(await placeOrder(d, { ...buy, price: 2640 }));
-    market.candleData = [minute(START + 2 * MINUTE, 2641, 2639, 2642)];
-    clock.ms = START + 5 * MINUTE;
+    expect(text(await placeOrder(d, { ...buy, price: 2640 }))).toMatch(/NO_STOP_LOSS.*must carry a stopLoss/);
+    expect((await placeOrder(d, { ...buy, price: 2640, stopLoss: 2630 })).isError).toBeFalsy();
+  });
 
-    expect((parse(await getPositions(d)))["unprotected"]).toEqual(["ETH"]);
-    const more = { ...buy, sizeUsd: 300, price: 2635 };
-    expect(text(await placeOrder(d, more))).toMatch(/NO_STOP_LOSS.*ETH has no stop-loss/);
+  it("blocks new risk while a position is unprotected, until a stop is set", async () => {
+    const d = deps(true);
+    const placed = parse(await placeOrder(d, { ...buy, stopLoss: 2630 })) as { stopLoss: { orderId: number } };
+    parse(await cancelOrder(d, { symbol: "ETH", orderId: placed.stopLoss.orderId }));
+
+    expect(parse(await getPositions(d))["unprotected"]).toEqual(["ETH"]);
+    const more = { ...buy, sizeUsd: 300, price: 2635, stopLoss: 2625 };
+    expect(text(await placeOrder({ ...d }, { ...more, symbol: "ETH" }))).not.toMatch(/ETH has no stop-loss/);
+
+    // An order for another symbol cannot vouch for ETH.
+    const btc = deps(true);
+    btc.engine = new RiskEngine({ ...btc.engine.configuredLimits, symbolAllowlist: ["ETH", "BTC"] });
+    expect(text(await placeOrder(btc, { ...more, symbol: "BTC" }))).toMatch(/NO_STOP_LOSS.*ETH has no stop-loss/);
 
     parse(await setStopLoss(d, { symbol: "ETH", triggerPrice: 2625, reason: "Below the base." }));
-    expect((await placeOrder(d, more)).isError).toBeFalsy();
+    expect(parse(await getPositions(d))["unprotected"]).toEqual([]);
   });
 
   it("treats a position that outgrew its stop as unprotected", async () => {

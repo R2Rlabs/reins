@@ -473,6 +473,32 @@ describe("stop-loss orders", () => {
     expect(lastOrderAction().builder).toEqual({ b: "0x000000000000000000000000000000000000dead", f: 20 });
   });
 
+  it("sends an order and its stop together in the normalTpsl grouping", async () => {
+    transport.reply("exchange:order", RESTING);
+    await client().placeOrder({ symbol: "ETH", side: "buy", size: 0.7557, price: 2640, tif: "Alo", stopLoss: 2630.8 });
+
+    const action = lastOrderAction();
+    expect(action.grouping).toBe("normalTpsl");
+    expect(action.orders).toHaveLength(2);
+    expect(action.orders[0]).toMatchObject({ b: true, p: "2640", s: "0.7557", r: false, t: { limit: { tif: "Alo" } } });
+    // The child closes what the parent opens, sized the same, reduce-only.
+    expect(action.orders[1]).toEqual({
+      a: 1,
+      b: false,
+      p: "2499.3",
+      s: "0.7557",
+      r: true,
+      t: { trigger: { isMarket: true, triggerPx: "2630.8", tpsl: "sl" } },
+    });
+  });
+
+  it("keeps the plain grouping when no stop rides along", async () => {
+    transport.reply("exchange:order", RESTING);
+    await client().placeOrder({ symbol: "ETH", side: "buy", size: 1, price: 2640 });
+    expect(lastOrderAction()).toMatchObject({ grouping: "na" });
+    expect(lastOrderAction().orders).toHaveLength(1);
+  });
+
   it("puts a short's stop above the trigger", async () => {
     transport.reply("exchange:order", RESTING);
     await client().placeStopLoss({ ...STOP, side: "buy", triggerPrice: 2700 });

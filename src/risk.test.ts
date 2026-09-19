@@ -201,7 +201,7 @@ describe("requireStopLoss", () => {
 
   it("refuses new risk while another position has no stop", () => {
     const decision = guarded.check(
-      { symbol: "ETH", side: "buy", sizeUsd: 1_000, marketable: true, hasStopLoss: true },
+      { symbol: "ETH", side: "buy", sizeUsd: 1_000, hasStopLoss: true },
       { ...long, unprotectedSymbols: ["BTC"] },
     );
     expect(decision).toMatchObject({ allowed: false, code: "NO_STOP_LOSS" });
@@ -211,41 +211,41 @@ describe("requireStopLoss", () => {
   it("lets an order that brings its own stop cover its own symbol", () => {
     expect(
       guarded.check(
-        { symbol: "BTC", side: "buy", sizeUsd: 1_000, marketable: true, hasStopLoss: true },
+        { symbol: "BTC", side: "buy", sizeUsd: 1_000, hasStopLoss: true },
         { ...long, unprotectedSymbols: ["BTC"] },
       ),
     ).toEqual({ allowed: true });
   });
 
-  it("wants a stop on an order that fills now, but not on one that rests", () => {
+  it("wants a stop on every order that adds risk, resting or not", () => {
+    const decision = guarded.check({ symbol: "ETH", side: "buy", sizeUsd: 1_000 }, flat);
+    expect(decision).toMatchObject({ allowed: false, code: "NO_STOP_LOSS" });
+    expect(decision.allowed === false && decision.reason).toMatch(/must carry a stopLoss/);
     expect(
-      guarded.check({ symbol: "ETH", side: "buy", sizeUsd: 1_000, marketable: true }, flat),
-    ).toMatchObject({ allowed: false, code: "NO_STOP_LOSS" });
-    expect(
-      guarded.check({ symbol: "ETH", side: "buy", sizeUsd: 1_000, marketable: false }, flat),
+      guarded.check({ symbol: "ETH", side: "buy", sizeUsd: 1_000, hasStopLoss: true }, flat),
     ).toEqual({ allowed: true });
   });
 
   it("never stands in the way of reducing risk", () => {
     const unprotected = { ...long, unprotectedSymbols: ["BTC"] };
     expect(
-      guarded.check({ symbol: "BTC", side: "sell", sizeUsd: 5_000, reduceOnly: true, marketable: true }, unprotected),
+      guarded.check({ symbol: "BTC", side: "sell", sizeUsd: 5_000, reduceOnly: true }, unprotected),
     ).toEqual({ allowed: true });
     // Not flagged reduce-only, but it only shrinks the position.
     expect(
-      guarded.check({ symbol: "BTC", side: "sell", sizeUsd: 2_000, marketable: true }, unprotected),
+      guarded.check({ symbol: "BTC", side: "sell", sizeUsd: 2_000 }, unprotected),
     ).toEqual({ allowed: true });
   });
 
   it("counts flipping a position through zero as new risk", () => {
     expect(
-      guarded.check({ symbol: "BTC", side: "sell", sizeUsd: 7_000, marketable: true }, long),
+      guarded.check({ symbol: "BTC", side: "sell", sizeUsd: 7_000 }, long),
     ).toMatchObject({ allowed: false, code: "NO_STOP_LOSS" });
   });
 
   it("is off unless configured", () => {
     expect(
-      new RiskEngine(limits).check({ symbol: "ETH", side: "buy", sizeUsd: 1_000, marketable: true }, {
+      new RiskEngine(limits).check({ symbol: "ETH", side: "buy", sizeUsd: 1_000 }, {
         ...long,
         unprotectedSymbols: ["BTC"],
       }),

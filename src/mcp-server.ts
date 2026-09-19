@@ -396,6 +396,14 @@ export function getCandles(
     );
     const candles = raw.slice(-count);
     const last = candles.at(-1);
+    // How far price typically travels in one candle: a yardstick for how far
+    // a stop must sit to survive ordinary noise. The forming candle is left
+    // out; half-built, it would understate it.
+    const complete = candles.filter((c) => c.T < now);
+    const averageRange =
+      complete.length > 0
+        ? round(complete.reduce((sum, c) => sum + Number(c.h) - Number(c.l), 0) / complete.length, 4)
+        : undefined;
     return ok({
       symbol: args.symbol,
       interval,
@@ -408,6 +416,7 @@ export function getCandles(
         volume: Number(c.v),
       })),
       lastCandleComplete: last ? last.T < now : undefined,
+      averageRange,
     });
   });
 }
@@ -434,14 +443,8 @@ export function placeOrder(
 
     // Checked before anything is sent, so a bad stop never leaves a filled
     // entry behind it.
-    if (args.stopLoss !== undefined) {
-      if (args.reduceOnly) return fail("A reduce-only order closes risk; it takes no stopLoss.");
-      if (!marketable) {
-        return fail(
-          "stopLoss goes on an order that fills now (no price). For a resting order, " +
-            "call set_stop_loss once it has filled.",
-        );
-      }
+    if (args.stopLoss !== undefined && args.reduceOnly) {
+      return fail("A reduce-only order closes risk; it takes no stopLoss.");
     }
 
     const limitPrice =
@@ -463,7 +466,6 @@ export function placeOrder(
       symbol: args.symbol,
       side: args.side,
       sizeUsd: args.sizeUsd,
-      marketable,
       hasStopLoss: args.stopLoss !== undefined,
     };
     if (args.reduceOnly !== undefined) request.reduceOnly = args.reduceOnly;
@@ -499,6 +501,10 @@ export function placeOrder(
         price: limitPrice,
         reduceOnly: args.reduceOnly ?? false,
         tif,
+        // A resting order takes its stop with it, placed by the exchange as it
+        // fills. An order that fills now gets its stop just below, sized to
+        // the whole position and replacing any older one.
+        ...(args.stopLoss !== undefined && !marketable ? { stopLoss: args.stopLoss } : {}),
       });
     } catch (error) {
       record.error = error instanceof Error ? error.message : String(error);
@@ -512,6 +518,18 @@ export function placeOrder(
 
     if (outcome.kind === "rejected") return fail(`Exchange rejected the order: ${outcome.message}`);
     const result = { ...outcome, sizeUsd: args.sizeUsd, limitPrice: round(limitPrice, 6) };
+    if (args.stopLoss !== undefined && !marketable) {
+      return ok(
+        {
+          ...result,
+          stopLoss: {
+            triggerPrice: args.stopLoss,
+            placed: "by the exchange, for each part of this order as it fills",
+          },
+        },
+        warning,
+      );
+    }
     if (args.stopLoss === undefined || outcome.kind !== "filled") return ok(result, warning);
 
     // The entry filled, so it stands whatever happens next. A stop that fails
@@ -732,7 +750,9 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
       description:
         "Recent price history for a symbol as candles, oldest first: open, high, " +
         "low, close and volume for each interval. The newest candle is usually " +
-        "still forming — lastCandleComplete says whether it has closed.",
+        "still forming — lastCandleComplete says whether it has closed. averageRange " +
+        "is the mean high-to-low of the complete candles: how far price typically " +
+        "moves in one interval.",
       inputSchema: z.object({
         symbol: z.string().describe("Perp symbol, for example BTC or ETH."),
         interval: z
@@ -792,9 +812,10 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
           .positive()
           .optional()
           .describe(
-            "Trigger price of a stop-loss to place under the whole position as soon as " +
-              "this order fills. Only for orders without a price, which fill now; below " +
-              "the entry for a buy, above it for a sell.",
+            "Trigger price of a stop-loss for this order: below the entry for a buy, above " +
+              "it for a sell. An order that fills now gets a stop under the whole position; " +
+              "a resting order takes its stop with it, placed as it fills, so the position " +
+              "is never unprotected.",
           ),
       }),
     },

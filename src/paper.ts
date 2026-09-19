@@ -73,6 +73,8 @@ export interface RestingOrder {
   placedAt: number;
   /** Candles opening before this have been checked already. Absent on older saves. */
   candlesCheckedFrom?: number;
+  /** A stop-loss placed for this order's fill the moment it fills. */
+  stopLoss?: number;
 }
 
 /** A reduce-only stop-market order, waiting for its trigger. */
@@ -377,6 +379,11 @@ export class PaperClient implements TradingClient {
     // reaching here did not cross, so it filled nothing and rests in full,
     // which is the whole point of posting one.
     const rests = tif !== "Ioc";
+    const stopLoss = reduceOnly ? undefined : params.stopLoss;
+    if (filled > 0 && stopLoss !== undefined) {
+      this.attachStop(state, params.symbol, params.side, filled, stopLoss, this.now());
+    }
+
     const remainder = roundTo(wantSize - filled, asset.szDecimals);
     if (remainder > 0 && rests) {
       state.resting.push({
@@ -387,6 +394,7 @@ export class PaperClient implements TradingClient {
         price: params.price,
         reduceOnly,
         placedAt: this.now(),
+        ...(stopLoss !== undefined ? { stopLoss } : {}),
       });
     }
 
@@ -580,14 +588,17 @@ export class PaperClient implements TradingClient {
     }
 
     const changed = due.length > 0;
+    const stopsBefore = stops.length;
     due.sort((a, b) => a.time - b.time);
     for (const event of due) {
       if (event.kind === "resting") this.fillResting(state, event.order, event.time);
       else this.fillStop(state, event.stop, event.time, event.price, books.get(event.stop.symbol));
     }
+    // Stops that rode in with an entry filled just now; they watch from next time.
+    const attached = stops.slice(stopsBefore);
 
     // A stop with no position left to protect has nothing to do.
-    const protecting = stopsLeft.filter((stop) => {
+    const protecting = [...stopsLeft, ...attached].filter((stop) => {
       const held = state.positions[stop.symbol]?.size ?? 0;
       return (held > 0 && stop.side === "sell") || (held < 0 && stop.side === "buy");
     });
@@ -621,6 +632,36 @@ export class PaperClient implements TradingClient {
       },
       time,
     );
+    if (order.stopLoss !== undefined) {
+      this.attachStop(state, order.symbol, order.side, size, order.stopLoss, time);
+    }
+  }
+
+  /**
+   * The stop that rides with an entry, placed for what just filled at the
+   * moment it filled — as Hyperliquid does for an order sent with a stop in
+   * the normalTpsl grouping. A fill found in a past candle is timed at that
+   * candle's open, so the stop watches that same minute too: if it went on
+   * through the stop, it fires, since whether the dip came before or after the
+   * fill is unknowable from a candle and the kinder guess would flatter the
+   * result. A fill that happened just now watches only what comes after it.
+   */
+  private attachStop(
+    state: PaperState,
+    symbol: string,
+    entrySide: "buy" | "sell",
+    size: number,
+    triggerPrice: number,
+    time: number,
+  ): void {
+    (state.stops ??= []).push({
+      oid: state.nextOid++,
+      symbol,
+      side: entrySide === "buy" ? "sell" : "buy",
+      size,
+      triggerPrice,
+      placedAt: time,
+    });
   }
 
   /**

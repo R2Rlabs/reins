@@ -17,7 +17,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 322 tests, no network calls in any of them.
+Early, but real. 328 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -195,7 +195,7 @@ every attempt is written to the decision log.
 | `get_limits` | Limits, headroom per symbol, remaining loss budget, halted state |
 | `get_positions` | Signed notional per symbol, account value, today's realised PnL, stop-losses, and which positions have none |
 | `get_book` | Best bid/ask, spread, nearest levels |
-| `get_candles` | Price history in 1m to 1d candles; the newest says whether it is still forming |
+| `get_candles` | Price history in 1m to 1d candles, the average range of one candle, and whether the newest is still forming |
 | `place_order` | **Sized in USD**, not asset units — the same unit as the limits. Optional `stopLoss` on orders that fill now |
 | `set_stop_loss` | Puts a stop under the whole of a position, or moves one; held by the exchange |
 | `cancel_order` | By exchange order id, stops included |
@@ -222,22 +222,28 @@ closes the whole position at market once the price reaches it.
   any stop already on that symbol — the new one goes on before the old one
   comes off, so the position is never bare in between. It refuses a trigger on
   the wrong side of the market, which would fire at once.
-- `place_order` with `stopLoss` does both in one call for an order that fills
-  now. If the entry fills but the stop fails, the fill still stands and the
-  agent is told plainly that the position is unprotected.
+- `place_order` with `stopLoss` protects the entry in the same call. An order
+  that fills now gets a stop under the whole position straight after; if that
+  stop fails, the fill still stands and the agent is told plainly that the
+  position is unprotected. A **resting** order carries its stop with it, and
+  the exchange places it for each part as it fills — so an entry that waits on
+  the book at the cheaper maker fee is never bare once it fills.
 - `close_position` takes the stop off with the position.
 - **`REINS_REQUIRE_STOP_LOSS=true`** makes it a limit rather than a habit: the
-  risk engine refuses anything that adds risk while any position lacks a stop
-  covering all of it (`NO_STOP_LOSS`), and an order that fills now must carry
-  its own. Reducing risk is never blocked. A resting entry can still fill bare;
-  after that, nothing new is allowed until the agent sets a stop.
+  risk engine refuses any order that adds risk without its own `stopLoss`, and
+  anything that adds risk while a position lacks a stop covering all of it
+  (`NO_STOP_LOSS`). Reducing risk is never blocked.
 
-On the wire the stop is the trigger order Hyperliquid's Python SDK signs in its
-`tpsl` test vector, and `signing.test.ts` reproduces that vector byte for byte
-on both networks. Its worst fill price sits 5% past the trigger — the SDK's own
-default slippage — because a stop that refuses to fill protects nothing. Paper
-mode fires stops from the same one-minute candles as resting orders, in the
-order the market reached them. Not yet exercised against a funded live account.
+On the wire a standalone stop is the trigger order Hyperliquid's Python SDK
+signs in its `tpsl` test vector, and `signing.test.ts` reproduces that vector
+byte for byte on both networks. A resting order and its stop go out together in
+the `normalTpsl` grouping, as the SDK's `basic_tpsl` example sends them. The
+stop's worst fill price sits 5% past the trigger — the SDK's own default
+slippage — because a stop that refuses to fill protects nothing. Paper mode
+fires stops from the same one-minute candles as resting orders, in the order the
+market reached them; a stop attached to a fill found in a past candle watches
+that same minute too, since which came first cannot be told from a candle.
+Neither kind has yet been sent from a funded live account.
 
 ### Running it
 

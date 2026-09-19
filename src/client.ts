@@ -79,6 +79,13 @@ export interface PlaceOrderParams {
   tif?: Tif;
   /** Client order id, 128-bit hex. */
   cloid?: string;
+  /**
+   * Trigger price of a stop-loss that rides with this order: the exchange
+   * places it for whatever fills, as it fills, so a resting entry is never
+   * bare between filling and anyone noticing. Sent as Hyperliquid's
+   * `normalTpsl` grouping, as the Python SDK's basic_tpsl example does.
+   */
+  stopLoss?: number;
 }
 
 /** Perps builder fees are capped at 0.1%, or 100 tenths of a basis point. */
@@ -309,10 +316,14 @@ export class HyperliquidClient {
     };
     if (params.cloid !== undefined) order.c = params.cloid;
 
+    const orders = [order];
+    if (params.stopLoss !== undefined) {
+      orders.push(stopWire(asset, params.side === "buy" ? "sell" : "buy", order.s, params.stopLoss));
+    }
     const action: OrderAction = {
       type: "order",
-      orders: [order],
-      grouping: "na",
+      orders,
+      grouping: params.stopLoss !== undefined ? "normalTpsl" : "na",
     };
     // Attaching the builder code is how this library earns anything, so it is
     // done here rather than left to each call site to remember.
@@ -342,23 +353,8 @@ export class HyperliquidClient {
   }): Promise<OrderOutcome> {
     const signer = this.requireSigner();
     const asset = await this.assetInfo(params.symbol);
-    const worst = params.side === "sell" ? params.triggerPrice * 0.95 : params.triggerPrice * 1.05;
+    const order = stopWire(asset, params.side, formatSize(params.size, asset.szDecimals), params.triggerPrice);
     const triggerPx = formatPrice(params.triggerPrice, asset.szDecimals);
-
-    const order: WireOrder = {
-      a: asset.index,
-      b: params.side === "buy",
-      p: formatPrice(worst, asset.szDecimals),
-      s: formatSize(params.size, asset.szDecimals),
-      r: true,
-      t: {
-        trigger: {
-          isMarket: true,
-          triggerPx,
-          tpsl: "sl",
-        },
-      },
-    };
     const action: OrderAction = { type: "order", orders: [order], grouping: "na" };
     if (this.builder) {
       action.builder = { b: this.builder.address, f: this.builder.feeTenthsBps };
@@ -507,6 +503,35 @@ export class HyperliquidClient {
       );
     }
   }
+}
+
+/**
+ * A reduce-only stop-market trigger on the wire, in the shape the Python SDK
+ * signs in its tpsl test vector. `p` is the worst fill, 5% past the trigger —
+ * the SDK's own default slippage — because a stop that refuses to fill in a
+ * fast market protects nothing. `side` is the side that closes the position.
+ */
+function stopWire(
+  asset: AssetMeta & { index: number },
+  side: "buy" | "sell",
+  size: string,
+  triggerPrice: number,
+): WireOrder {
+  const worst = side === "sell" ? triggerPrice * 0.95 : triggerPrice * 1.05;
+  return {
+    a: asset.index,
+    b: side === "buy",
+    p: formatPrice(worst, asset.szDecimals),
+    s: size,
+    r: true,
+    t: {
+      trigger: {
+        isMarket: true,
+        triggerPx: formatPrice(triggerPrice, asset.szDecimals),
+        tpsl: "sl",
+      },
+    },
+  };
 }
 
 /**

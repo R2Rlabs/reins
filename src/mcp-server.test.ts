@@ -248,6 +248,21 @@ describe("get_candles", () => {
     expect(body["lastCandleComplete"]).toBe(false);
   });
 
+  it("averages the range of complete candles only, as a yardstick for stops", async () => {
+    const ranged = (openTime: number, low: number, high: number) => ({
+      ...candle(openTime, 80_000),
+      l: String(low),
+      h: String(high),
+    });
+    const { deps } = candleSetup([
+      ranged(hourStart - 2 * HOUR, 80_000, 80_600), // 600
+      ranged(hourStart - HOUR, 80_000, 81_000), // 1,000
+      ranged(hourStart, 80_000, 80_050), // forming: excluded
+    ]);
+    const body = parse(await getCandles(deps, { symbol: "BTC", count: 3 }));
+    expect(body["averageRange"]).toBe(800);
+  });
+
   it("says the last candle is complete once its close time has passed", async () => {
     const { deps } = candleSetup([candle(hourStart - HOUR, 80_100)]);
     const body = parse(await getCandles(deps, { symbol: "BTC", count: 1 }));

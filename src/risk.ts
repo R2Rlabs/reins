@@ -19,11 +19,10 @@ export interface RiskLimits {
   /** Orders per rolling 60s window. */
   maxOrdersPerMinute: number;
   /**
-   * No new risk while any position is unprotected. When set, an order that
-   * opens or adds to a position is refused if some position has no stop-loss
-   * covering all of it, and an order that fills immediately must bring its own
-   * stop. The agent's own "I'll exit below X" becomes an order the exchange
-   * executes whether or not the agent is awake.
+   * No new risk without a stop. When set, an order that opens or adds to a
+   * position must carry its own stop-loss, and is refused while some position
+   * has no stop covering all of it. The agent's own "I'll exit below X" becomes
+   * an order the exchange executes whether or not the agent is awake.
    */
   requireStopLoss?: boolean;
 }
@@ -46,9 +45,7 @@ export interface OrderRequest {
   sizeUsd: number;
   /** Orders that can only shrink an existing position skip most checks. */
   reduceOnly?: boolean;
-  /** Fills immediately (crosses the spread) rather than resting on the book. */
-  marketable?: boolean;
-  /** Carries a stop-loss that will cover the symbol's whole position once filled. */
+  /** Carries a stop-loss, placed as the order fills. */
   hasStopLoss?: boolean;
 }
 
@@ -183,13 +180,13 @@ export class RiskEngine {
             `covering the whole position. Set one with set_stop_loss before adding risk.`,
         };
       }
-      if (order.marketable && !order.hasStopLoss) {
+      if (!order.hasStopLoss) {
         return {
           allowed: false,
           code: "NO_STOP_LOSS",
           reason:
-            "An order that fills immediately must carry a stopLoss, so the position " +
-            "is never open without one.",
+            "An order that opens or adds to a position must carry a stopLoss, so the " +
+            "position is never open without one.",
         };
       }
     }

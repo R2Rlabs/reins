@@ -18,7 +18,7 @@ When that works, with your own key:
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-... npm run demo -- --once     # one cycle; prints what it cost
-ANTHROPIC_API_KEY=sk-ant-... npm run demo               # a cycle every 30 min until the budget runs out
+ANTHROPIC_API_KEY=sk-ant-... npm run demo               # a cycle every hour until the budget runs out
 npm run demo:report                                     # a postable summary so far
 ```
 
@@ -117,20 +117,19 @@ checked before every call, persisted in `demo-data/spend.json`, and cumulative
 across restarts — a demo that runs for weeks gets restarted, and a cap that
 reset each time would not be a cap. It can overshoot by at most one call.
 
-Rough expectations, **estimated, not measured** — there was no API key to
-measure with when this was written:
+**Measured on the first run** (September 2026, `claude-opus-5`, `high`
+effort): 37 cycles for $5.02, about **$0.14 a cycle**, 3–5 model calls each.
+A cycle that trades costs a little more than one that holds. At the default
+**one cycle an hour** that is roughly **$3.30 a day**; the first run went every
+30 minutes and spent its $5 in about 17 hours.
 
-- A cycle is typically 4–8 model calls. On `claude-opus-5` at the default
-  `high` effort, expect somewhere around **$0.25–$0.50 per cycle**, mostly
-  output and thinking tokens. Later cycles cost a little more as the recalled
-  history grows.
-- Every 30 minutes that is roughly **$12–$25 a day**, so the default $5 budget
-  lasts a few hours. That is deliberate: run `--once`, read the real cost it
-  prints, then choose.
+For scale, that run's paper account moved $27 over the same hours — the model
+bill is not small next to the trading itself, which is worth knowing before
+running an agent against real money.
 
 To stretch a budget, in rough order of effect:
 
-1. **`--interval-minutes 120`** — the agent does not need to look every half hour.
+1. **`--interval-minutes 120`** — slower markets rarely need a look every hour.
 2. **`--effort medium`** — Anthropic's own guidance calls `low` and `medium`
    "unusually effective" on Opus 5 and the primary cost lever.
 3. **`--model claude-sonnet-5`** — about 2.5x cheaper per token.

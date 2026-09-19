@@ -167,7 +167,8 @@ export interface BuilderFee {
 export interface OrderAction {
   type: "order";
   orders: WireOrder[];
-  grouping: "na";
+  /** "normalTpsl" when a stop-loss rides with the order and activates as it fills. */
+  grouping: "na" | "normalTpsl";
   builder?: BuilderFee;
 }
 
