@@ -600,10 +600,14 @@ export class PaperClient implements TradingClient {
   }
 
   private fillResting(state: PaperState, order: RestingOrder, time: number): void {
+    let size = order.size;
     if (order.reduceOnly) {
       const held = state.positions[order.symbol]?.size ?? 0;
       const opposes = (held > 0 && order.side === "sell") || (held < 0 && order.side === "buy");
       if (held === 0 || !opposes) return; // the position it was protecting is gone; drop it
+      // Sized when it was placed; the position may have shrunk since. Reduce-only
+      // never takes more than is left, or it would flip the position.
+      size = Math.min(size, Math.abs(held));
     }
     this.applyFill(
       state,
@@ -611,7 +615,7 @@ export class PaperClient implements TradingClient {
         oid: order.oid,
         symbol: order.symbol,
         side: order.side,
-        size: order.size,
+        size,
         price: order.price,
         liquidity: "maker",
       },

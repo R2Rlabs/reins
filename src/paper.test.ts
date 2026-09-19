@@ -479,6 +479,25 @@ describe("reduce-only", () => {
     expect(state.positions["BTC"]).toBeUndefined();
     expect(state.fills[1]!.size).toBe(2);
   });
+
+  it("takes only what is left when a resting one fills after the position shrank", async () => {
+    const paper = client();
+    await paper.placeOrder({ symbol: "BTC", side: "buy", size: 2, price: 100_020, tif: "Ioc" });
+    // A take-profit resting for the whole 2 BTC.
+    await paper.placeOrder({ symbol: "BTC", side: "sell", size: 2, price: 100_100, reduceOnly: true });
+    // Most of the position is closed some other way first.
+    await paper.placeOrder({ symbol: "BTC", side: "sell", size: 1.5, price: 99_000, reduceOnly: true, tif: "Ioc" });
+
+    // Now the market trades up through the resting order.
+    market.current = book([[100_200, 5]], [[100_210, 5]]);
+    await paper.accountState();
+
+    const state = await paper.snapshot();
+    // Flat — not short 1.5, which filling the original 2 would have left.
+    expect(state.positions["BTC"]).toBeUndefined();
+    expect(state.fills.at(-1)).toMatchObject({ side: "sell", size: 0.5, price: 100_100 });
+    expect(state.resting).toHaveLength(0);
+  });
 });
 
 describe("account state", () => {
