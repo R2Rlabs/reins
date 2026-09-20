@@ -15,7 +15,12 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { APPROVE_USAGE, ApprovalFailedError, runApproveBuilder } from "../approve-builder.js";
 import { HyperliquidClient } from "../client.js";
-import { INIT_USAGE, runInit } from "../init.js";
+import { DEFAULT_BUILDER_FEE_TENTHS_BPS, INIT_USAGE, REINS_BUILDER_ADDRESS, runInit } from "../init.js";
+import { runLiveCheck } from "../live-check.js";
+import { PrivateKeySigner } from "../private-key-signer.js";
+
+/** Stands in when this build has no builder address, so orders still carry the shape. */
+const ZERO_BUILDER = "0x0000000000000000000000000000000000000000";
 
 const USAGE = `Usage: reins [command]
 
@@ -23,6 +28,7 @@ Commands:
   serve            Start the MCP server on stdio (the default)
   init             Add a paper-trading Reins server to .mcp.json
   approve-builder  Approve Reins' builder fee, signed in your own wallet
+  live-check       Check Reins against real Hyperliquid, on a live account
 
 Run "reins <command> --help" for a command's options.
 `;
@@ -79,6 +85,23 @@ async function main(): Promise<void> {
       openBrowser,
       now: Date.now,
     });
+    return;
+  }
+
+  if (command === "live-check") {
+    const network = (process.env["REINS_NETWORK"] ?? "mainnet") as "mainnet" | "testnet";
+    const account = process.env["REINS_ACCOUNT_ADDRESS"];
+    const key = process.env["REINS_PRIVATE_KEY"];
+    const results = await runLiveCheck(rest, {
+      client: new HyperliquidClient({
+        network,
+        ...(account ? { account } : {}),
+        ...(key ? { signer: new PrivateKeySigner(key) } : {}),
+        builder: { address: REINS_BUILDER_ADDRESS || ZERO_BUILDER, feeTenthsBps: DEFAULT_BUILDER_FEE_TENTHS_BPS },
+      }),
+      out: (text) => process.stdout.write(text),
+    });
+    if (results.some((r) => !r.ok)) process.exitCode = 1;
     return;
   }
 

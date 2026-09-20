@@ -17,7 +17,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 328 tests, no network calls in any of them.
+Early, but real. 340 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -29,10 +29,11 @@ Early, but real. 328 tests, no network calls in any of them.
 | `src/trading-client.ts` | The interface live and paper both satisfy |
 | `src/decision-log.ts` | Append-only record of every attempt and its stated reason |
 | `src/decision-log-file.ts` | JSON Lines log on disk |
-| `src/bin/cli.ts` | The `reins` command: `serve` (default), `init` and `approve-builder` |
+| `src/bin/cli.ts` | The `reins` command: `serve` (default), `init`, `approve-builder` and `live-check` |
 | `src/bin/serve.ts` | stdio entry point |
 | `src/init.ts` | `reins init` — writes a paper-mode server entry into `.mcp.json` |
 | `src/approve-builder.ts` | `reins approve-builder` — the user approves the builder fee in their own wallet |
+| `src/live-check.ts` | `reins live-check` — proves the live exchange accepts what Reins sends |
 | `src/builder-approval.ts` | The ApproveBuilderFee action: EIP-712 typed data, signature checks |
 | `src/format.ts` | Price and size formatting to Hyperliquid's tick and lot rules |
 | `src/signing.ts` | L1 action signing, verified against the Python SDK's vectors |
@@ -268,6 +269,26 @@ Hyperliquid's 10 bp cap). Before a live order can carry it, the user approves
 it once with `ApproveBuilderFee` from their main wallet, and the builder
 address must hold at least 100 USDC in its Hyperliquid perps account. Setting
 the constant to `""` stops `init` writing any builder code.
+
+### Checking it against the real exchange
+
+Unit tests prove Reins signs what Hyperliquid's own SDK signs. They cannot
+prove Hyperliquid accepts it. `reins live-check` does, on a real account:
+
+```bash
+REINS_ACCOUNT_ADDRESS=0x… node dist/bin/cli.js live-check           # reads only, free
+REINS_ACCOUNT_ADDRESS=0x… REINS_PRIVATE_KEY=0x… \
+  node dist/bin/cli.js live-check --trade --size-usd 12             # a few cents in fees
+```
+
+The reads check the account, the market, open orders and whether the account
+has approved Reins' builder fee. With `--trade` it then walks the whole order
+path with the smallest position the venue allows: a post-only order with a stop
+attached, a cancel, a market entry, a stop placed and moved, the position
+closed, and a sweep for anything left open. It stops at the first answer that
+is not what Reins expects and prints what came back instead, so a failure names
+the step rather than leaving you to guess. The test size is capped at $100, and
+the resting order sits 3% away so it cannot fill while the check runs.
 
 ### Approving the fee
 
