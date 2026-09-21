@@ -696,7 +696,7 @@ export const TOOL_NAMES = [
 ] as const;
 
 export function createMcpServer(deps: McpServerDeps): McpServer {
-  const server = new McpServer({ name: "reins", version: "0.0.1" });
+  const server = new McpServer({ name: "reins", version: "0.1.0" });
 
   server.registerTool(
     "get_limits",

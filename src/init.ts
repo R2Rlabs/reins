@@ -161,6 +161,9 @@ export function parseInitArgs(argv: string[]): InitOptions {
   };
 }
 
+/** The npm package. npm refused plain "reins" as too close to "redis". */
+export const PACKAGE_NAME = "@r2rlabs/reins";
+
 export interface Launch {
   command: string;
   args: string[];
@@ -175,7 +178,7 @@ export interface Launch {
 export function launchCommand(scriptPath: string, platform: NodeJS.Platform): Launch {
   const fromNpxCache = scriptPath.split(/[\\/]/).includes("_npx");
   if (fromNpxCache) {
-    const npx = ["-y", "reins", "serve"];
+    const npx = ["-y", PACKAGE_NAME, "serve"];
     return platform === "win32"
       ? { command: "cmd", args: ["/c", "npx", ...npx] }
       : { command: "npx", args: npx };

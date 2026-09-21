@@ -121,18 +121,18 @@ describe("launchCommand", () => {
   });
 
   it("goes back through npx when run from npx's cache", () => {
-    const cached = "/home/u/.npm/_npx/1a2b/node_modules/reins/dist/bin/cli.js";
+    const cached = "/home/u/.npm/_npx/1a2b/node_modules/@r2rlabs/reins/dist/bin/cli.js";
     expect(launchCommand(cached, "darwin")).toEqual({
       command: "npx",
-      args: ["-y", "reins", "serve"],
+      args: ["-y", "@r2rlabs/reins", "serve"],
     });
   });
 
   it("wraps npx in cmd on Windows", () => {
-    const cached = "C:\\Users\\u\\AppData\\Local\\npm-cache\\_npx\\1a2b\\node_modules\\reins\\dist\\bin\\cli.js";
+    const cached = "C:\\Users\\u\\AppData\\Local\\npm-cache\\_npx\\1a2b\\node_modules\\@r2rlabs\\reins\\dist\\bin\\cli.js";
     expect(launchCommand(cached, "win32")).toEqual({
       command: "cmd",
-      args: ["/c", "npx", "-y", "reins", "serve"],
+      args: ["/c", "npx", "-y", "@r2rlabs/reins", "serve"],
     });
   });
 });

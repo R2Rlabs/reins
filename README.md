@@ -17,7 +17,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 340 tests, no network calls in any of them.
+Early, but real. 347 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -251,13 +251,13 @@ slippage — because a stop that refuses to fill protects nothing. Paper mode
 fires stops from the same one-minute candles as resting orders, in the order the
 market reached them; a stop attached to a fill found in a past candle watches
 that same minute too, since which came first cannot be told from a candle.
-Neither kind has yet been sent from a funded live account.
+Both kinds, and moving a stop, were accepted by mainnet from a funded account
+in `live-check --trade` on 2026-09-21.
 
 ### Running it
 
 ```bash
-npm run build
-node dist/bin/cli.js init       # `npx reins init` once published
+npx @r2rlabs/reins init         # from a clone: npm run build && node dist/bin/cli.js init
 ```
 
 `init` adds a **paper-mode** `reins` server to `./.mcp.json` (keeping any other
@@ -283,9 +283,9 @@ Unit tests prove Reins signs what Hyperliquid's own SDK signs. They cannot
 prove Hyperliquid accepts it. `reins live-check` does, on a real account:
 
 ```bash
-REINS_ACCOUNT_ADDRESS=0x… node dist/bin/cli.js live-check           # reads only, free
+REINS_ACCOUNT_ADDRESS=0x… npx @r2rlabs/reins live-check             # reads only, free
 REINS_ACCOUNT_ADDRESS=0x… REINS_PRIVATE_KEY=0x… \
-  node dist/bin/cli.js live-check --trade --size-usd 12             # a few cents in fees
+  npx @r2rlabs/reins live-check --trade --size-usd 12               # a few cents in fees
 ```
 
 The reads check the account, the market, open orders and whether the account
@@ -295,13 +295,16 @@ attached, a cancel, a market entry, a stop placed and moved, the position
 closed, and a sweep for anything left open. It stops at the first answer that
 is not what Reins expects and prints what came back instead, so a failure names
 the step rather than leaving you to guess. The test size is capped at $100, and
-the resting order sits 3% away so it cannot fill while the check runs.
+the resting order sits 3% away so it cannot fill while the check runs. With the
+position open it also re-reads the account value, which catches equity read
+wrongly for the account's mode. All 12 steps have passed on mainnet, from a
+Manual account and from a Unified one.
 
 ### Approving the fee
 
 ```bash
-node dist/bin/cli.js approve-builder              # `npx reins approve-builder` once published
-node dist/bin/cli.js approve-builder --check 0x…  # what a wallet has approved
+npx @r2rlabs/reins approve-builder              # from a clone: node dist/bin/cli.js approve-builder
+npx @r2rlabs/reins approve-builder --check 0x…  # what a wallet has approved
 ```
 
 The approval must be signed by the user's **main wallet**, so Reins never asks
