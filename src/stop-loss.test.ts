@@ -9,6 +9,7 @@ import {
   closePosition,
   getPositions,
   placeOrder,
+  recordExchangeFills,
   setStopLoss,
   type McpServerDeps,
   type ToolResult,
@@ -250,6 +251,88 @@ describe("close_position", () => {
     parse(await placeOrder(d, { ...buy, stopLoss: 2630.8 }));
     parse(await closePosition(d, { symbol: "ETH", reason: "Done." }));
     expect(await paper.stopLosses()).toEqual([]);
+  });
+
+  // Demo run 2: closing a 0.03073 BTC short bought back 0.03067, because the
+  // size came from the dollar value divided by a limit price above the market.
+  it("closes a short completely, sized from the position rather than its dollar value", async () => {
+    const d = deps();
+    parse(await placeOrder(d, { symbol: "ETH", side: "sell", sizeUsd: 2_000, reason: "Breakdown.", stopLoss: 2660 }));
+    const opened = (await paper.snapshot()).fills[0]!.size;
+
+    const body = parse(await closePosition(d, { symbol: "ETH", reason: "Done." }));
+
+    expect(body).toMatchObject({ closed: true, totalSize: String(opened) });
+    expect(body).not.toHaveProperty("remainingSize");
+    expect((await paper.snapshot()).positions).toEqual({});
+    expect(await paper.stopLosses()).toEqual([]);
+  });
+
+  it("says so when the close leaves part of the position open", async () => {
+    const d = deps();
+    parse(await placeOrder(d, { ...buy, stopLoss: 2630.8 }));
+    market.current = book([[2643, 0.3]], [[2643.5, 5]]); // too thin to take it all
+    const body = parse(await closePosition(d, { symbol: "ETH", reason: "Done." }));
+
+    expect(body["remainingSize"]).toBeCloseTo(0.7558 - 0.3, 6);
+    expect(body["warning"]).toMatch(/still open/);
+    expect(await paper.stopLosses()).toHaveLength(1); // the rest stays protected
+  });
+});
+
+describe("fills the exchange made without an agent call", () => {
+  const kinds = () =>
+    log.records.map((r) => (r.tool === "exchange_fill" ? `${r.tool}:${String(r.request["kind"])}` : r.tool));
+
+  it("records a stop-loss firing, which no tool call would otherwise log", async () => {
+    const d = deps();
+    parse(await placeOrder(d, { ...buy, stopLoss: 2630.8 }));
+    const dip = START + 8 * MINUTE;
+    market.candleData = [minute(dip, 2635, 2629.4, 2636)];
+    clock.ms = START + 30 * MINUTE;
+
+    expect(await recordExchangeFills(d)).toBe(1);
+    expect(kinds()).toEqual(["place_order", "set_stop_loss", "exchange_fill:stop_loss"]);
+    const fired = log.records.at(-1)!;
+    expect(fired.reason).toMatch(/^Not an agent decision: stop-loss \d+ fired on the exchange, sell 0.7558 ETH at 2630.8\.$/);
+    expect(fired.request).toMatchObject({ filledAt: new Date(dip).toISOString(), symbol: "ETH" });
+    expect(fired.outcome).toMatchObject({ kind: "filled", totalSize: "0.7558", avgPrice: "2630.8" });
+  });
+
+  it("records a resting entry filling later, and the stop that rode with it", async () => {
+    const d = deps();
+    parse(await placeOrder(d, { ...buy, price: 2640, stopLoss: 2630 }));
+    market.candleData = [minute(START + 2 * MINUTE, 2641, 2639, 2642), minute(START + 9 * MINUTE, 2633, 2628, 2634)];
+    clock.ms = START + 30 * MINUTE;
+    await paper.accountState(); // the entry fills
+    await paper.accountState(); // its stop sees the later dip
+
+    expect(await recordExchangeFills(d)).toBe(2);
+    expect(kinds()).toEqual(["place_order", "exchange_fill:resting_order", "exchange_fill:stop_loss"]);
+    expect(log.records[1]!.reason).toMatch(/order \d+, resting since .+, filled on the exchange, buy/);
+  });
+
+  it("writes each fill once, however often it is asked", async () => {
+    const d = deps();
+    parse(await placeOrder(d, { ...buy, stopLoss: 2630.8 }));
+    market.candleData = [minute(START + 8 * MINUTE, 2635, 2629.4, 2636)];
+    clock.ms = START + 30 * MINUTE;
+    await recordExchangeFills(d);
+    expect(await recordExchangeFills(d)).toBe(0);
+    expect(log.records.filter((r) => r.tool === "exchange_fill")).toHaveLength(1);
+  });
+
+  it("leaves fills the agent already logged alone", async () => {
+    const d = deps();
+    parse(await placeOrder(d, buy));
+    parse(await closePosition(d, { symbol: "ETH", reason: "Done." }));
+    expect(await recordExchangeFills(d)).toBe(0);
+  });
+
+  it("does nothing without a log to write to, or anything in it", async () => {
+    const { log: _none, ...withoutLog } = deps();
+    expect(await recordExchangeFills(withoutLog)).toBe(0);
+    expect(await recordExchangeFills(deps())).toBe(0);
   });
 });
 

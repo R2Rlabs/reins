@@ -363,7 +363,13 @@ export async function appendToLog(path: string, record: LogRecord): Promise<void
 export interface DemoSummary {
   decisions: number;
   placed: number;
+  /** Filled the moment they were sent. */
   filled: number;
+  /** Rested, then filled later: the exchange_fill records Reins writes. */
+  filledLater: number;
+  stopsFired: number;
+  /** Fills Reins did not place at all. */
+  outsideFills: number;
   refusedByLimits: DecisionRecord[];
   held: HoldRecord[];
   rejectedByExchange: number;
@@ -379,6 +385,9 @@ export function summarize(records: LogRecord[]): DemoSummary {
     decisions: ordered.length,
     placed: 0,
     filled: 0,
+    filledLater: 0,
+    stopsFired: 0,
+    outsideFills: 0,
     refusedByLimits: [],
     held: [],
     rejectedByExchange: 0,
@@ -388,6 +397,13 @@ export function summarize(records: LogRecord[]): DemoSummary {
   for (const record of ordered) {
     if (record.tool === "hold") {
       summary.held.push(record);
+      continue;
+    }
+    if (record.tool === "exchange_fill") {
+      const kind = record.request["kind"];
+      if (kind === "stop_loss") summary.stopsFired++;
+      else if (kind === "resting_order") summary.filledLater++;
+      else summary.outsideFills++;
       continue;
     }
     if (record.risk && !record.risk.allowed) {
@@ -464,10 +480,15 @@ export function formatReport(
   }
 
   lines.push(
-    `Actions: ${summary.placed} orders sent, ${summary.filled} filled, ` +
+    `Actions: ${summary.placed} orders sent, ${summary.filled + summary.filledLater} filled ` +
+      `(${summary.filled} at once, ${summary.filledLater} while resting), ` +
       `${summary.refusedByLimits.length} refused by the limits, ` +
-      `${summary.rejectedByExchange} rejected by the market, ${summary.stopsSet} stop-losses set`,
+      `${summary.rejectedByExchange} rejected by the market`,
+    `Stop-losses: ${summary.stopsSet} set, ${summary.stopsFired} fired`,
   );
+  if (summary.outsideFills > 0) {
+    lines.push(`Fills Reins did not place: ${summary.outsideFills}`);
+  }
 
   const lastHold = summary.held.at(-1);
   if (lastHold) {

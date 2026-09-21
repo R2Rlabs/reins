@@ -19,7 +19,12 @@ import type { CancelOutcome, OrderOutcome } from "./types.js";
  * testimony, useful for debugging and audit, not as proof of mechanism.
  */
 
-export type DecisionTool = "place_order" | "close_position" | "cancel_order" | "set_stop_loss";
+/**
+ * The tools an agent calls, plus `exchange_fill`: a fill the exchange made
+ * without an agent call — a stop firing, a resting order filling later. Its
+ * `reason` is Reins' description, not the agent's; it is not a decision.
+ */
+export type DecisionTool = "place_order" | "close_position" | "cancel_order" | "set_stop_loss" | "exchange_fill";
 
 export interface DecisionContext {
   accountValueUsd: number;

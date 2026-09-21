@@ -2,6 +2,7 @@ import type { PlaceOrderParams } from "./client.js";
 import type { AccountState } from "./risk.js";
 import type { MarketDataSource, TradingClient } from "./trading-client.js";
 import type {
+  AccountFill,
   BookLevel,
   CancelOutcome,
   Candle,
@@ -103,6 +104,8 @@ export interface PaperFill {
   realizedPnlUsd: number;
   liquidity: "taker" | "maker";
   time: number;
+  /** Set when a stop-loss made the fill. Fills from before this existed lack it. */
+  stop?: true;
 }
 
 export interface PaperState {
@@ -504,6 +507,27 @@ export class PaperClient implements TradingClient {
     });
   }
 
+  fillsSince(startTime: number): Promise<AccountFill[]> {
+    return this.serialize(async () => {
+      const state = await this.load();
+      await this.matchResting(state);
+      return state.fills
+        .filter((fill) => fill.time >= startTime)
+        .sort((a, b) => a.time - b.time)
+        .map((fill) => ({
+          oid: fill.oid,
+          symbol: fill.symbol,
+          side: fill.side,
+          size: fill.size,
+          price: fill.price,
+          time: fill.time,
+          feeUsd: fill.feeUsd,
+          closedPnlUsd: fill.realizedPnlUsd,
+          stop: fill.stop ?? false,
+        }));
+    });
+  }
+
   // --- simulation internals -------------------------------------------------
 
   private async markPrices(symbols: string[]): Promise<Record<string, number>> {
@@ -697,7 +721,7 @@ export class PaperClient implements TradingClient {
 
     this.applyFill(
       state,
-      { oid: stop.oid, symbol: stop.symbol, side: stop.side, size: filled, price, liquidity: "taker" },
+      { oid: stop.oid, symbol: stop.symbol, side: stop.side, size: filled, price, liquidity: "taker", stop: true },
       time,
     );
   }
@@ -733,6 +757,7 @@ export class PaperClient implements TradingClient {
       size: number;
       price: number;
       liquidity: "taker" | "maker";
+      stop?: true;
     },
     time: number = this.now(),
   ): void {

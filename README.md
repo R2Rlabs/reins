@@ -17,7 +17,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 347 tests, no network calls in any of them.
+Early, but real. 357 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -112,6 +112,14 @@ jq -r 'select(.risk.allowed == false) | [.time, .risk.code, .reason] | @tsv' dec
 Each record holds the stated reason, the request, the account context at the
 time, the risk verdict, and the outcome. Set `REINS_LOG_FILE` to persist it;
 without it the log lives in memory and dies with the process.
+
+The exchange also acts on its own: a stop-loss fires, a resting order fills
+hours after it was placed. Before every tool call Reins compares the account's
+fills with the log and appends each one it has not seen as an `exchange_fill`
+record, whose reason starts "Not an agent decision:" and says whether it was a
+stop, a resting order, or a fill Reins did not place. Without them the trade
+that mattered most, the stop that closed it, would be missing from the record.
+The agent reads them back through `get_recent_decisions` like anything else.
 
 ### Two things to be clear about
 

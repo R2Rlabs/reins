@@ -10,6 +10,8 @@ import {
   type CandleInterval,
   type CancelOutcome,
   type AccountAbstraction,
+  type AccountFill,
+  type HistoricalOrder,
   type ClearinghouseState,
   type SpotClearinghouseState,
   type ExchangeRequest,
@@ -304,6 +306,34 @@ export class HyperliquidClient {
       user: address.toLowerCase(),
       aggregateByTime: false,
     });
+  }
+
+  /**
+   * Fills since `startTime`, oldest first, each marked with whether it came
+   * from a stop. A fill does not say so itself; the order history does, so it
+   * is read only when there is a fill to explain.
+   */
+  async fillsSince(startTime: number, user?: string): Promise<AccountFill[]> {
+    const fills = (await this.userFills(user)).filter((fill) => fill.time >= startTime);
+    if (fills.length === 0) return [];
+    const history = await this.postInfo<HistoricalOrder[]>({
+      type: "historicalOrders",
+      user: this.requireAddress(user).toLowerCase(),
+    });
+    const stops = new Set(history.filter((entry) => entry.order.isTrigger).map((entry) => entry.order.oid));
+    return fills
+      .sort((a, b) => a.time - b.time)
+      .map((fill) => ({
+        oid: fill.oid,
+        symbol: fill.coin,
+        side: fill.side === "B" ? ("buy" as const) : ("sell" as const),
+        size: Number(fill.sz),
+        price: Number(fill.px),
+        time: fill.time,
+        feeUsd: Number(fill.fee),
+        closedPnlUsd: Number(fill.closedPnl),
+        stop: stops.has(fill.oid),
+      }));
   }
 
   /**

@@ -435,6 +435,38 @@ describe("account state", () => {
   });
 });
 
+describe("fillsSince", () => {
+  // Shapes from the live test on mainnet, 2026-09-21. A fill does not say it
+  // came from a stop; the order history does.
+  const fill = (oid: number, time: number, side: "A" | "B") => ({
+    coin: "BTC", px: "85125.0", sz: "0.00014", side, time, startPosition: "0.00014", dir: "Close Long",
+    closedPnl: "-0.00252", hash: "0x0", oid, crossed: true, fee: "0.007745", builderFee: "0.002383",
+  });
+  const order = (oid: number, isTrigger: boolean) => ({
+    order: { coin: "BTC", oid, isTrigger, orderType: isTrigger ? "Stop Market" : "Limit" },
+    status: "filled",
+  });
+
+  it("marks the fills that came from a stop, oldest first, and skips older ones", async () => {
+    transport
+      .reply("info:userFills", [fill(3, 3_000, "A"), fill(2, 2_000, "B"), fill(1, 1_000, "B")])
+      .reply("info:historicalOrders", [order(3, true), order(2, false)]);
+    const fills = await client().fillsSince(1_500);
+
+    expect(fills.map((f) => [f.oid, f.side, f.stop])).toEqual([
+      [2, "buy", false],
+      [3, "sell", true],
+    ]);
+    expect(fills[1]).toMatchObject({ symbol: "BTC", size: 0.00014, price: 85125, feeUsd: 0.007745, closedPnlUsd: -0.00252 });
+  });
+
+  it("does not read the order history when there is nothing to explain", async () => {
+    transport.reply("info:userFills", [fill(1, 1_000, "B")]);
+    expect(await client().fillsSince(5_000)).toEqual([]);
+    expect(transport.callsTo("info:historicalOrders")).toHaveLength(0);
+  });
+});
+
 describe("candles", () => {
   // The shape candleSnapshot returned for BTC on mainnet, 2026-09-18.
   const CANDLE = {

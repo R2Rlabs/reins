@@ -518,6 +518,23 @@ describe("summarize", () => {
     expect(text).toContain('"Nothing worth doing."');
   });
 
+  it("counts what the exchange filled on its own, and never as orders sent", () => {
+    const exchangeFill = (kind: string) =>
+      record({ tool: "exchange_fill", request: { kind }, outcome: { kind: "filled", oid: 9, totalSize: "1", avgPrice: "1" } });
+    const summary = summarize([
+      record({ risk: { allowed: true }, outcome: { kind: "resting", oid: 9 } }),
+      exchangeFill("resting_order"),
+      record({ tool: "set_stop_loss", risk: { allowed: true }, outcome: { kind: "resting", oid: 10 } }),
+      exchangeFill("stop_loss"),
+    ]);
+    expect(summary).toMatchObject({ placed: 1, filled: 0, filledLater: 1, stopsSet: 1, stopsFired: 1, outsideFills: 0 });
+
+    const text = formatReport(summary, undefined, 10_000, undefined);
+    expect(text).toContain("1 orders sent, 1 filled (0 at once, 1 while resting)");
+    expect(text).toContain("Stop-losses: 1 set, 1 fired");
+    expect(text).not.toContain("did not place");
+  });
+
   it("skips a torn final line in the log", () => {
     const raw = `${JSON.stringify(record({}))}\n{"id":"tru`;
     expect(parseDecisionLog(raw)).toHaveLength(1);

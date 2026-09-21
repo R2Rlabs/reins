@@ -117,6 +117,28 @@ export interface Fill {
   hash: string;
 }
 
+/**
+ * A fill on the account, in the shape Reins reports it. `stop` says whether
+ * the order that filled was a stop-loss rather than an ordinary order.
+ */
+export interface AccountFill {
+  oid: number;
+  symbol: string;
+  side: "buy" | "sell";
+  size: number;
+  price: number;
+  time: number;
+  feeUsd: number;
+  closedPnlUsd: number;
+  stop: boolean;
+}
+
+/** One entry of `historicalOrders`, as much of it as Reins reads. */
+export interface HistoricalOrder {
+  order: { oid: number; isTrigger: boolean };
+  status: string;
+}
+
 // --- exchange endpoint -----------------------------------------------------
 
 export type Tif = "Alo" | "Ioc" | "Gtc";

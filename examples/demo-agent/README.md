@@ -26,7 +26,9 @@ Each cycle is a fresh, bounded conversation: the agent recalls earlier cycles
 with `get_recent_decisions`, checks its limits, positions and the book, and
 decides whether to act. Doing nothing is a valid decision.
 
-Reins itself logs only actions, so when a cycle ends without a trade the demo
+Reins logs the agent's actions and, as `exchange_fill` records, what the
+exchange did on its own: stops firing and resting orders filling. When a cycle
+ends without a trade the demo
 appends a `hold` record to the same log, with the account state and, as the
 reason, the one-line `Held because:` the agent is asked to end on (its whole
 closing reply if it leaves that out; the full reply always prints to the

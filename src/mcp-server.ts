@@ -9,7 +9,7 @@ import {
 } from "./decision-log.js";
 import type { AccountState, Decision, OrderRequest, RiskEngine } from "./risk.js";
 import type { TradingClient } from "./trading-client.js";
-import type { L2Book } from "./types.js";
+import type { AccountFill, L2Book } from "./types.js";
 
 export interface McpServerDeps {
   /** A live client or a paper one — the tools cannot tell the difference. */
@@ -588,7 +588,7 @@ export function closePosition(
   args: { symbol: string; reason: string },
 ): Promise<ToolResult> {
   return guard(async () => {
-    const state = await deps.client.accountState();
+    const [state, held] = await Promise.all([deps.client.accountState(), deps.client.openPositions()]);
     const current = state.positionsUsd[args.symbol] ?? 0;
     if (current === 0) {
       return ok({ closed: false, detail: `No open ${args.symbol} position.` });
@@ -601,6 +601,10 @@ export function closePosition(
       buffer(deps) * 2,
     );
     const sizeUsd = Math.abs(current);
+    // The exact size held. Converting the dollar value back at the limit
+    // price came out short for a short, whose limit sits above the market,
+    // and left a sliver open behind a close reported as done.
+    const size = Math.abs(held[args.symbol]?.size ?? 0) || sizeUsd / limitPrice;
 
     const record = startRecord(deps, "close_position", args.reason, {
       symbol: args.symbol,
@@ -625,7 +629,7 @@ export function closePosition(
       outcome = await deps.client.placeOrder({
         symbol: args.symbol,
         side,
-        size: sizeUsd / limitPrice,
+        size,
         price: limitPrice,
         reduceOnly: true,
         tif: "Ioc",
@@ -645,8 +649,10 @@ export function closePosition(
     // A stop left behind a closed position would sit on the exchange with
     // nothing to protect. Best effort: the close itself has already happened.
     const cancelledStops: number[] = [];
+    let remaining: number | undefined;
     try {
       const { positions, stops } = await protection(deps);
+      remaining = positions[args.symbol]?.size;
       if (!positions[args.symbol]) {
         for (const stop of stops.filter((s) => s.symbol === args.symbol)) {
           const cancelled = await deps.client.cancelOrder(args.symbol, stop.oid);
@@ -662,10 +668,102 @@ export function closePosition(
         ...outcome,
         sizeUsd: round(sizeUsd),
         ...(cancelledStops.length > 0 ? { cancelledStopLosses: cancelledStops } : {}),
+        // An Ioc can fill in part. Say so, rather than let "closed" stand for
+        // a position that is still there.
+        ...(remaining !== undefined
+          ? { remainingSize: remaining, warning: `${args.symbol} is still open (${remaining}); its stop, if any, was kept.` }
+          : {}),
       },
       warning,
     );
   });
+}
+
+/** How many recent records are read to work out what the log already holds. */
+const RECONCILE_WINDOW = 200;
+
+/**
+ * Write down the fills the exchange made without an agent call: a stop-loss
+ * firing, or a resting order filling hours after it was placed. The log
+ * otherwise holds only what the agent did, so the trade that mattered most —
+ * the stop that closed it — would be missing from it.
+ *
+ * Each fill is matched against the log by order id. A fill of an order logged
+ * as filling on the spot is already there; anything else is appended once, as
+ * an `exchange_fill` record whose reason says plainly that it was not a
+ * decision. Fills from before the oldest record read are left alone: they
+ * belong to trading the log never saw.
+ */
+export async function recordExchangeFills(deps: McpServerDeps): Promise<number> {
+  if (!deps.log) return 0;
+  const recent = await deps.log.read(RECONCILE_WINDOW);
+  if (recent.length === 0) return 0;
+  const since = Math.min(...recent.map((r) => Date.parse(r.time)));
+
+  const fills = await deps.client.fillsSince(since);
+  if (fills.length === 0) return 0;
+
+  const filledAtOnce = new Set<number>();
+  const logged = new Set<string>();
+  const restingSince = new Map<number, string>();
+  const stopOids = new Set<number>();
+  for (const record of recent) {
+    const outcome = record.outcome;
+    if (record.tool === "exchange_fill") {
+      const times = (record.request["fillTimes"] as string[] | undefined) ?? [];
+      for (const time of times) logged.add(`${String(record.request["orderId"])}@${time}`);
+    } else if (outcome?.kind === "filled") {
+      filledAtOnce.add(outcome.oid);
+    } else if (outcome?.kind === "resting") {
+      if (record.tool === "set_stop_loss") stopOids.add(outcome.oid);
+      else restingSince.set(outcome.oid, record.time);
+    }
+  }
+
+  const byOrder = new Map<number, AccountFill[]>();
+  for (const fill of fills) {
+    if (filledAtOnce.has(fill.oid)) continue;
+    if (logged.has(`${fill.oid}@${new Date(fill.time).toISOString()}`)) continue;
+    byOrder.set(fill.oid, [...(byOrder.get(fill.oid) ?? []), fill]);
+  }
+
+  const now = deps.now ?? Date.now;
+  const records = [...byOrder.entries()]
+    .map(([oid, parts]) => {
+      const size = parts.reduce((sum, f) => sum + f.size, 0);
+      const price = parts.reduce((sum, f) => sum + f.size * f.price, 0) / size;
+      const first = parts[0]!;
+      const kind = first.stop || stopOids.has(oid) ? "stop_loss" : restingSince.has(oid) ? "resting_order" : "outside_reins";
+      const what = `${first.side} ${round(size, 8)} ${first.symbol} at ${round(price, 6)}`;
+      const reason =
+        kind === "stop_loss"
+          ? `Not an agent decision: stop-loss ${oid} fired on the exchange, ${what}.`
+          : kind === "resting_order"
+            ? `Not an agent decision: order ${oid}, resting since ${restingSince.get(oid)}, filled on the exchange, ${what}.`
+            : `Not an agent decision: a fill Reins did not place (order ${oid}), ${what}. A trade made outside Reins.`;
+      const record: DecisionRecord = {
+        id: (deps.newId ?? defaultIds)(),
+        time: new Date(now()).toISOString(),
+        tool: "exchange_fill",
+        reason,
+        request: {
+          kind,
+          orderId: oid,
+          symbol: first.symbol,
+          side: first.side,
+          filledAt: new Date(first.time).toISOString(),
+          fillTimes: parts.map((f) => new Date(f.time).toISOString()),
+          realizedPnlUsd: round(parts.reduce((sum, f) => sum + f.closedPnlUsd, 0), 6),
+          feeUsd: round(parts.reduce((sum, f) => sum + f.feeUsd, 0), 6),
+        },
+        outcome: { kind: "filled", oid, totalSize: String(round(size, 8)), avgPrice: String(round(price, 8)) },
+      };
+      return record;
+    })
+    .sort((a, b) => String(a.request["filledAt"]).localeCompare(String(b.request["filledAt"])));
+
+  for (const record of records) await deps.log.append(record);
+  return records.length;
 }
 
 export function getRecentDecisions(
@@ -698,6 +796,15 @@ export const TOOL_NAMES = [
 export function createMcpServer(deps: McpServerDeps): McpServer {
   const server = new McpServer({ name: "reins", version: "0.1.0" });
 
+  // Before every tool, write down what the exchange did since the last one: a
+  // stop that fired, a resting order that filled. One at a time, so two tools
+  // called together cannot write the same fill twice; never fatal to the tool.
+  let catchingUp: Promise<unknown> = Promise.resolve();
+  const withFills = (run: () => Promise<ToolResult>): Promise<ToolResult> => {
+    catchingUp = catchingUp.then(() => recordExchangeFills(deps)).catch(() => undefined);
+    return catchingUp.then(run);
+  };
+
   server.registerTool(
     "get_limits",
     {
@@ -708,7 +815,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
         "changes them — check here before sizing an order rather than discovering a " +
         "limit by being rejected.",
     },
-    () => getLimits(deps),
+    () => withFills(() => getLimits(deps)),
   );
 
   server.registerTool(
@@ -719,7 +826,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
         "Open positions with their signed notional in USD (negative is short), " +
         "account value, and realised PnL so far today.",
     },
-    () => getPositions(deps),
+    () => withFills(() => getPositions(deps)),
   );
 
   server.registerTool(
@@ -740,7 +847,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
           .describe("How many levels per side to return. Defaults to 5."),
       }),
     },
-    (args) => getBook(deps, args),
+    (args) => withFills(() => getBook(deps, args)),
   );
 
   server.registerTool(
@@ -768,7 +875,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
           .describe("How many of the most recent candles to return. Defaults to 24."),
       }),
     },
-    (args) => getCandles(deps, args),
+    (args) => withFills(() => getCandles(deps, args)),
   );
 
   server.registerTool(
@@ -819,7 +926,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
           ),
       }),
     },
-    (args) => placeOrder(deps, args),
+    (args) => withFills(() => placeOrder(deps, args)),
   );
 
   server.registerTool(
@@ -843,7 +950,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
           ),
       }),
     },
-    (args) => setStopLoss(deps, args),
+    (args) => withFills(() => setStopLoss(deps, args)),
   );
 
   server.registerTool(
@@ -857,7 +964,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
         reason: z.string().optional().describe("Why you are cancelling, if not obvious."),
       }),
     },
-    (args) => cancelOrder(deps, args),
+    (args) => withFills(() => cancelOrder(deps, args)),
   );
 
   server.registerTool(
@@ -876,7 +983,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
           .describe("Why you are closing this position, in one or two sentences."),
       }),
     },
-    (args) => closePosition(deps, args),
+    (args) => withFills(() => closePosition(deps, args)),
   );
 
   server.registerTool(
@@ -886,7 +993,9 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
       description:
         "Your own recent actions and the reasons you gave for them, most recent " +
         "first, including any that the risk limits refused. Useful after a restart, " +
-        "when you no longer remember what you already did.",
+        "when you no longer remember what you already did. Records with tool " +
+        "exchange_fill are what the exchange did without you: a stop-loss firing, or " +
+        "a resting order filling after you placed it.",
       inputSchema: z.object({
         limit: z
           .number()
@@ -897,7 +1006,7 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
           .describe("How many records to return. Defaults to 10."),
       }),
     },
-    (args) => getRecentDecisions(deps, args),
+    (args) => withFills(() => getRecentDecisions(deps, args)),
   );
 
   return server;

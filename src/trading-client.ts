@@ -1,6 +1,7 @@
 import type { PlaceOrderParams } from "./client.js";
 import type { AccountState } from "./risk.js";
 import type {
+  AccountFill,
   AssetMeta,
   CancelOutcome,
   Candle,
@@ -38,6 +39,12 @@ export interface TradingClient {
   stopLosses(): Promise<StopLoss[]>;
   /** Signed sizes in asset units. accountState only carries USD notional. */
   openPositions(): Promise<Record<string, { size: number; entryPrice: number }>>;
+  /**
+   * The account's fills since `startTime`, oldest first. How Reins learns of
+   * what the exchange did without being asked: a stop firing, a resting
+   * order filling hours after it was placed.
+   */
+  fillsSince(startTime: number): Promise<AccountFill[]>;
 }
 
 /**
