@@ -1,12 +1,48 @@
 # Reins
 
-An execution layer for trading agents on Hyperliquid. Position limits, daily loss
-caps and a kill switch enforced **outside the model**, not in the prompt.
+**Let an AI agent trade without giving it the power to lose everything.**
 
-Reins is not an exchange. It holds no liquidity, custodies no funds and matches no
-orders — Hyperliquid does all three. Reins sits in front of it, checks every order
-an agent wants to place against limits the agent cannot change, and routes what
-survives. Revenue comes from Hyperliquid builder codes on the flow it routes.
+```bash
+npx @r2rlabs/reins init      # adds a paper-trading Reins server to .mcp.json
+```
+
+See it at work: [an AI agent trading Hyperliquid on paper, run 2](https://gist.github.com/R2Rlabs/246a5009684787a586ddee1d2615eb14).
+
+### What Reins is
+
+- **Limits the agent can't argue with.** Every order passes checks that live
+  outside the model: position size, leverage, daily loss, which markets it may
+  trade, and a stop-loss on every position. No prompt, clever reasoning or
+  mistake gets around them.
+- **A record you can check.** Every decision is logged with the reason the agent
+  gave — including the orders it was refused, the times it chose to wait, and
+  what the exchange did without it. You can compare what the agent *said* with
+  what actually *happened*.
+- **Somewhere to rehearse.** Paper trading on live Hyperliquid prices with
+  realistic fills and fees, using the same tools and limits as live trading.
+- **Non-custodial.** Your money stays in your own Hyperliquid account. Reins
+  trades through an API wallet, which can place orders but cannot withdraw.
+- **Paid for openly.** A small builder fee (2 bp) on live orders, shown up front,
+  and optional.
+
+### What Reins is not
+
+- **Not a trading bot or a strategy.** Reins doesn't decide what to trade and
+  won't make an agent profitable. The demo agent is a test drive, not the product.
+- **Not an exchange, broker or custodian.** It holds no funds and matches no
+  orders; Hyperliquid does that.
+- **Not a promise against losses.** Limits cap how much can go wrong. They don't
+  make bad trades good, and stops can slip in fast markets.
+- **Not financial advice.**
+- **Not something you have to take on trust.** Not the agent's word, and not
+  ours: every action is on the record.
+
+### Principles
+
+1. Limits live outside the model.
+2. The record outranks the reasoning.
+3. Paper before real money.
+4. Your keys, your funds.
 
 ## Why this exists
 
