@@ -1,6 +1,6 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { parseArgs } from "node:util";
-import { MAX_PERP_BUILDER_FEE_TENTHS_BPS } from "./client.js";
+import { DEFAULT_BUILDER_FEE_TENTHS_BPS } from "./builder-fee.js";
 import { TOOL_NAMES } from "./mcp-server.js";
 import type { Network } from "./types.js";
 
@@ -12,16 +12,7 @@ import type { Network } from "./types.js";
  * by hand, and no key is ever asked for, read or written here.
  */
 
-/**
- * Where Reins' default builder fee is paid: a plain wallet address on
- * Hyperliquid, which must hold at least 100 USDC in its perps account for
- * orders carrying the fee to be accepted. Set to "" to stop init writing any
- * builder code.
- */
-export const REINS_BUILDER_ADDRESS: string = "0x658DC3a1fc753262c83c7345032E6DB7Aa8fA997";
-
-/** 2 bp, in the tenths of a basis point Hyperliquid's `f` field uses. */
-export const DEFAULT_BUILDER_FEE_TENTHS_BPS = 20;
+export { DEFAULT_BUILDER_FEE_TENTHS_BPS, REINS_BUILDER_ADDRESS } from "./builder-fee.js";
 
 export const INIT_USAGE = `Usage: reins init [options]
 
@@ -39,8 +30,6 @@ Options:
   --log <path>             Decision log file         (default ./decisions.jsonl)
   --paper-file <path>      Paper account file        (default ./paper-run.json)
   --file <path>            Config file to write           (default ./.mcp.json)
-  --builder-fee <bp>       Reins' fee on live orders, basis points     (default 2)
-  --no-builder-fee         Send orders with no builder fee
   --print                  Print the entry instead of writing a file
   --force                  Replace an existing "reins" entry
   -h, --help               Show this help
@@ -57,26 +46,9 @@ export interface InitOptions {
   logFile: string;
   paperFile: string;
   configFile: string;
-  /** Tenths of a basis point, or undefined with --no-builder-fee. */
-  builderFeeTenthsBps: number | undefined;
   print: boolean;
   force: boolean;
   help: boolean;
-}
-
-/** Basis points to tenths, refusing what `f` cannot express or the cap forbids. */
-function builderFee(raw: string): number {
-  const tenths = positive("builder-fee", raw) * 10;
-  if (!Number.isInteger(Math.round(tenths * 1e9) / 1e9)) {
-    throw new Error(`--builder-fee goes in steps of 0.1 bp, got "${raw}".`);
-  }
-  if (tenths > MAX_PERP_BUILDER_FEE_TENTHS_BPS) {
-    throw new Error(
-      `--builder-fee can be at most ${MAX_PERP_BUILDER_FEE_TENTHS_BPS / 10} bp ` +
-        `(0.1%, Hyperliquid's cap on perps), got "${raw}".`,
-    );
-  }
-  return Math.round(tenths);
 }
 
 function positive(flag: string, raw: string): number {
@@ -103,9 +75,6 @@ export function parseInitArgs(argv: string[]): InitOptions {
       log: { type: "string", default: "./decisions.jsonl" },
       "paper-file": { type: "string", default: "./paper-run.json" },
       file: { type: "string", default: "./.mcp.json" },
-      // No default here, so an explicit fee alongside --no-builder-fee shows.
-      "builder-fee": { type: "string" },
-      "no-builder-fee": { type: "boolean", default: false },
       print: { type: "boolean", default: false },
       force: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
@@ -134,15 +103,6 @@ export function parseInitArgs(argv: string[]): InitOptions {
     throw new Error(`--max-orders must be a whole number, got "${values["max-orders"]}".`);
   }
 
-  if (values["no-builder-fee"] && values["builder-fee"] !== undefined) {
-    throw new Error("--builder-fee and --no-builder-fee contradict each other; pick one.");
-  }
-  const builderFeeTenthsBps = values["no-builder-fee"]
-    ? undefined
-    : values["builder-fee"] === undefined
-      ? DEFAULT_BUILDER_FEE_TENTHS_BPS
-      : builderFee(values["builder-fee"]);
-
   return {
     symbols,
     maxPositionUsd: positive("max-position", values["max-position"]),
@@ -154,7 +114,6 @@ export function parseInitArgs(argv: string[]): InitOptions {
     logFile: values.log,
     paperFile: values["paper-file"],
     configFile: values.file,
-    builderFeeTenthsBps,
     print: values.print,
     force: values.force,
     help: values.help,
@@ -197,23 +156,9 @@ export interface ServerEntry {
  * from a working directory of their own choosing, and a relative log path
  * would scatter decision logs wherever that happened to be.
  *
- * The builder code goes in only when there is an address to pay and the user
- * has not opted out. Paper mode charges it too, so a paper run shows what the
- * fee would have cost.
+ * No builder fee is written: it is part of Reins, not a setting.
  */
-export function serverEntry(
-  opts: InitOptions,
-  launch: Launch,
-  cwd: string,
-  builderAddress: string = REINS_BUILDER_ADDRESS,
-): ServerEntry {
-  const builder =
-    builderAddress !== "" && opts.builderFeeTenthsBps !== undefined
-      ? {
-          REINS_BUILDER_ADDRESS: builderAddress,
-          REINS_BUILDER_FEE_TENTHS_BPS: String(opts.builderFeeTenthsBps),
-        }
-      : {};
+export function serverEntry(opts: InitOptions, launch: Launch, cwd: string): ServerEntry {
   return {
     command: launch.command,
     args: launch.args,
@@ -228,7 +173,6 @@ export function serverEntry(
       REINS_PAPER_BALANCE: String(opts.balanceUsd),
       REINS_PAPER_FILE: resolve(cwd, opts.paperFile),
       REINS_LOG_FILE: resolve(cwd, opts.logFile),
-      ...builder,
     },
   };
 }
@@ -284,8 +228,6 @@ export interface InitDeps {
   readFile: (path: string) => Promise<string | undefined>;
   writeFile: (path: string, content: string) => Promise<void>;
   out: (text: string) => void;
-  /** Defaults to REINS_BUILDER_ADDRESS; here so tests can supply one. */
-  builderAddress?: string;
 }
 
 export async function runInit(argv: string[], deps: InitDeps): Promise<void> {
@@ -295,12 +237,7 @@ export async function runInit(argv: string[], deps: InitDeps): Promise<void> {
     return;
   }
 
-  const entry = serverEntry(
-    opts,
-    launchCommand(deps.scriptPath, deps.platform),
-    deps.cwd,
-    deps.builderAddress ?? REINS_BUILDER_ADDRESS,
-  );
+  const entry = serverEntry(opts, launchCommand(deps.scriptPath, deps.platform), deps.cwd);
 
   if (opts.print) {
     deps.out(`${JSON.stringify({ mcpServers: { reins: entry } }, null, 2)}\n`);
@@ -318,22 +255,20 @@ export async function runInit(argv: string[], deps: InitDeps): Promise<void> {
       `${opts.symbols.join(", ")}\n` +
       `✓ Paper account — ${usd(opts.balanceUsd)} · ${display(entry.env["REINS_PAPER_FILE"]!, deps.cwd)}\n` +
       `✓ Decision log — ${display(entry.env["REINS_LOG_FILE"]!, deps.cwd)}\n` +
-      builderLine(entry) +
+      builderLine() +
       `✓ ${existing === undefined ? "Created" : "Updated"} ${display(configPath, deps.cwd)}\n` +
       `→ ${TOOL_NAMES.length} tools on stdio. Point your agent at it.\n`,
   );
 }
 
 /**
- * Said out loud whenever the fee is on: a fee nobody was told about is the
- * fastest way to lose the people paying it.
+ * Said out loud up front: a fee nobody was told about is the fastest way to
+ * lose the people paying it.
  */
-function builderLine(entry: ServerEntry): string {
-  const tenths = entry.env["REINS_BUILDER_FEE_TENTHS_BPS"];
-  if (tenths === undefined) return "";
+function builderLine(): string {
   return (
-    `✓ Builder fee — ${Number(tenths) / 10} bp to Reins on live orders; paper results include it\n` +
-    `  Remove with --no-builder-fee. Live trading needs a one-time ApproveBuilderFee.\n`
+    `✓ Builder fee — ${DEFAULT_BUILDER_FEE_TENTHS_BPS / 10} bp to Reins on live orders; paper results include it\n` +
+    `  Live trading needs a one-time approval: npx ${PACKAGE_NAME} approve-builder\n`
   );
 }
 

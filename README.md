@@ -22,8 +22,7 @@ See it at work: [an AI agent trading Hyperliquid on paper, run 2](https://gist.g
   realistic fills and fees, using the same tools and limits as live trading.
 - **Non-custodial.** Your money stays in your own Hyperliquid account. Reins
   trades through an API wallet, which can place orders but cannot withdraw.
-- **Paid for openly.** A small builder fee (2 bp) on live orders, shown up front,
-  and optional.
+- **Paid for openly.** A small builder fee (2 bp) on live orders, shown up front.
 
 ### What Reins is not
 
@@ -53,7 +52,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 357 tests, no network calls in any of them.
+Early, but real. 367 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -68,8 +67,11 @@ Early, but real. 357 tests, no network calls in any of them.
 | `src/bin/cli.ts` | The `reins` command: `serve` (default), `init`, `approve-builder` and `live-check` |
 | `src/bin/serve.ts` | stdio entry point |
 | `src/init.ts` | `reins init` — writes a paper-mode server entry into `.mcp.json` |
+| `src/builder-fee.ts` | Reins' builder fee, and the approval live trading needs before it starts |
 | `src/approve-builder.ts` | `reins approve-builder` — the user approves the builder fee in their own wallet |
 | `src/live-check.ts` | `reins live-check` — proves the live exchange accepts what Reins sends |
+| `src/platform-stats.ts` | `reins stats` — accounts, trades, volume and fees through Reins' builder code |
+| `src/lz4.ts` | Reads Hyperliquid's LZ4-compressed data files, without a dependency |
 | `src/builder-approval.ts` | The ApproveBuilderFee action: EIP-712 typed data, signature checks |
 | `src/format.ts` | Price and size formatting to Hyperliquid's tick and lot rules |
 | `src/signing.ts` | L1 action signing, verified against the Python SDK's vectors |
@@ -89,6 +91,10 @@ REINS_NETWORK=testnet          # mainnet spends real money
 REINS_ACCOUNT_ADDRESS=0x...    # your Hyperliquid account
 REINS_PRIVATE_KEY=0x...        # an API wallet's key, not your account's; omit to stay read-only
 ```
+
+On mainnet, approve Reins' 2 bp builder fee once, from the account's own
+wallet, before the first live session: `npx @r2rlabs/reins approve-builder`.
+Until the account has, live mode refuses to start and says so.
 
 **Use an API wallet, not your account's own key.** Hyperliquid lets an account
 approve API wallets that can trade for it but cannot withdraw from it — create
@@ -312,14 +318,12 @@ elsewhere with `--file`, or `--print` the entry instead. It never writes live
 mode or a key, and refuses to replace an existing `reins` entry without
 `--force`. `reins init --help` lists everything.
 
-`init` also adds Reins' builder code by default: **2 bp on live orders**, paid
-to `REINS_BUILDER_ADDRESS` in `src/init.ts`. It says so when it runs, paper
-results include the fee so they match what live would cost, and
-`--no-builder-fee` leaves it out (`--builder-fee 2` sets another rate, up to
-Hyperliquid's 10 bp cap). Before a live order can carry it, the user approves
-it once with `ApproveBuilderFee` from their main wallet, and the builder
-address must hold at least 100 USDC in its Hyperliquid perps account. Setting
-the constant to `""` stops `init` writing any builder code.
+Reins charges a builder fee of **2 bp on live mainnet orders**, paid to
+`REINS_BUILDER_ADDRESS` in `src/builder-fee.ts`. `init` says so when it runs,
+and paper results include the fee so they match what live would cost. Before
+live trading starts, the account approves the fee once from its own wallet
+(`npx @r2rlabs/reins approve-builder`); until it has, the server refuses to
+start in live mode and says how to approve. Testnet orders carry no fee.
 
 ### Checking it against the real exchange
 
@@ -343,6 +347,19 @@ the resting order sits 3% away so it cannot fill while the check runs. With the
 position open it also re-reads the account value, which catches equity read
 wrongly for the account's mode. All 12 steps have passed on mainnet, from a
 Manual account and from a Unified one.
+
+### Usage
+
+```bash
+npx @r2rlabs/reins stats              # the last 30 days
+npx @r2rlabs/reins stats --days 365 --json
+```
+
+Hyperliquid publishes every fill that carried a builder code in a daily file,
+once the UTC day has closed. `stats` reads those files for Reins' builder
+address and reports accounts (and new ones by day), trades, volume, fees
+earned, maker fills, stops fired and the busiest markets. Reins itself sends
+nothing home, so this is live mainnet trading only: paper runs leave no trace.
 
 ### Approving the fee
 
@@ -382,8 +399,6 @@ Or point an MCP client at it by hand:
         "REINS_DAILY_LOSS_USD": "500",
         "REINS_MAX_LEVERAGE": "3",
         "REINS_MAX_ORDERS_PER_MIN": "12",
-        "REINS_BUILDER_ADDRESS": "0xYOUR_BUILDER_ADDRESS",
-        "REINS_BUILDER_FEE_TENTHS_BPS": "10",
         "REINS_LOG_FILE": "./decisions.jsonl"
       }
     }

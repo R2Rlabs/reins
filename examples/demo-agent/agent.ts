@@ -50,7 +50,6 @@ const SERVER: Omit<DemoServerConfig, "paperFile" | "logFile"> = {
   maxLeverage: 3,
   maxOrdersPerMin: 6,
   paperBalanceUsd: 10_000,
-  builderFeeTenthsBps: 10,
   // Every position gets a stop the exchange holds, so an exit the agent
   // describes is one that happens even between cycles.
   requireStopLoss: true,

@@ -210,7 +210,6 @@ export interface DemoServerConfig {
   maxLeverage: number;
   maxOrdersPerMin: number;
   paperBalanceUsd: number;
-  builderFeeTenthsBps: number;
   requireStopLoss: boolean;
   paperFile: string;
   logFile: string;
@@ -243,11 +242,6 @@ export function buildServerEnv(
     REINS_PAPER_BALANCE: String(config.paperBalanceUsd),
     REINS_PAPER_FILE: config.paperFile,
     REINS_LOG_FILE: config.logFile,
-    // A builder address only switches the fee on; paper mode never sends
-    // anything, so this one is never used for real. It is here so simulated
-    // trades pay what a real user of Reins would.
-    REINS_BUILDER_ADDRESS: "0x000000000000000000000000000000000000dead",
-    REINS_BUILDER_FEE_TENTHS_BPS: String(config.builderFeeTenthsBps),
     REINS_REQUIRE_STOP_LOSS: String(config.requireStopLoss),
   });
 

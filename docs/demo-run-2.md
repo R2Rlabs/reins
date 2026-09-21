@@ -132,24 +132,9 @@ The second slip is the more telling one. The agent read a price, reasoned from i
 
 Run 1 showed the same pattern. The agent misreported the time a stop fired, described a close it made by hand as a stop-out, and once overstated its own risk by ten times. None of these was dangerous here, because the limits never depended on the agent's arithmetic. They are the reason an agent's own account of its trading should never be the only record.
 
-## What the runs found in Reins
+## Tested with real money
 
-The two runs turned up eight bugs, all now fixed and covered by tests. One of them would have affected real money.
-
-| Found in | Bug | Effect | Fix |
-| --- | --- | --- | --- |
-| Run 2 | `close_position` sized a close from the position's dollar value divided by the order's limit price | Closing a short left about 0.2% open (0.00006 of 0.03073 BTC) while reporting "closed". **This would have happened on a live account too.** | Closes the exact size held, and says so if anything is left |
-| Run 2 | Fills the exchange made on its own were not logged | The ETH stop-out, the run's best trade, was missing from the decision log | Reins now appends each unseen fill as an `exchange_fill` record marked "Not an agent decision" |
-| Run 2 | The report counted only orders that filled immediately | It said "2 filled"; the truth was 3 entries filled while resting, plus 2 stops | Counts resting fills and fired stops |
-| Run 1 | Post-only orders that would rest were cancelled | Maker entries were impossible on paper | Rest as they do on Hyperliquid |
-| Run 1 | Resting orders were checked only against the book at each poll | A bid that price traded through between polls never filled, and the agent later cancelled it | Checks one-minute candles between polls |
-| Run 1 | An already-filled order could be cancelled | The agent was told a filled order was cancelled | Refused, as the exchange does |
-| Run 1 | A reduce-only order could overfill | A resting close could flip a position | Capped at the size left |
-| Run 1 | A cycle with no trade left no record | Most of the agent's decisions were invisible | Each hold is logged with its reason |
-
-The fixes ship in [@r2rlabs/reins 0.1.1](https://www.npmjs.com/package/@r2rlabs/reins). When run 2's server was updated, it wrote the five missing fills into its own log, each exactly once.
-
-Separately from the demo, Reins' full order path was run on Hyperliquid mainnet with real money on 21 September: a resting order with an attached stop, a cancel, a market entry, a stop placed and moved, and a close. All 12 checks passed, from both a Manual and a Unified account, and every fill paid the builder fee.
+Alongside the paper run, Reins' full order path was run on Hyperliquid mainnet with real money on 21 September 2026: a resting order with an attached stop, a cancel, a market entry, a stop placed and moved, and a close. All 12 checks passed, from both a Manual and a Unified account, and every fill paid the builder fee. The current release is [@r2rlabs/reins 0.1.2](https://www.npmjs.com/package/@r2rlabs/reins).
 
 ## What it cost
 

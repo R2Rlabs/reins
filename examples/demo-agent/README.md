@@ -103,7 +103,7 @@ only, has no wallet key, and opens no ports.
 | Daily loss limit | $300 |
 | Max leverage | 3x |
 | Stop-losses | Required on every position (`REINS_REQUIRE_STOP_LOSS`) |
-| Fees | Hyperliquid base tier plus a 1 bp builder fee, so the curve pays what a real user would |
+| Fees | Hyperliquid base tier plus Reins' 2 bp builder fee, so the curve pays what a real user would |
 
 Edit `SERVER` at the top of `agent.ts` to change any of these.
 

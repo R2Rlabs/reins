@@ -6,6 +6,8 @@
  *   reins serve            the same, spelled out
  *   reins init             add a paper-trading Reins server to .mcp.json
  *   reins approve-builder  approve Reins' builder fee from your own wallet
+ *   reins live-check       check Reins against the real exchange
+ *   reins stats            trading through Reins' builder code, from Hyperliquid's data
  *
  * With no arguments this must behave exactly like serve.ts and print nothing
  * to stdout, because stdout then carries the MCP protocol.
@@ -17,6 +19,7 @@ import { APPROVE_USAGE, ApprovalFailedError, runApproveBuilder } from "../approv
 import { HyperliquidClient } from "../client.js";
 import { DEFAULT_BUILDER_FEE_TENTHS_BPS, INIT_USAGE, REINS_BUILDER_ADDRESS, runInit } from "../init.js";
 import { runLiveCheck } from "../live-check.js";
+import { STATS_USAGE, runStats } from "../platform-stats.js";
 import { PrivateKeySigner } from "../private-key-signer.js";
 
 /** Stands in when this build has no builder address, so orders still carry the shape. */
@@ -29,6 +32,7 @@ Commands:
   init             Add a paper-trading Reins server to .mcp.json
   approve-builder  Approve Reins' builder fee, signed in your own wallet
   live-check       Check Reins against real Hyperliquid, on a live account
+  stats            Accounts, trades, volume and fees through Reins' builder code
 
 Run "reins <command> --help" for a command's options.
 `;
@@ -105,6 +109,18 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (command === "stats") {
+    await runStats(rest, {
+      fetchBytes: async (url) => {
+        const response = await fetch(url);
+        return { status: response.status, bytes: new Uint8Array(await response.arrayBuffer()) };
+      },
+      now: Date.now,
+      out: (text) => process.stdout.write(text),
+    });
+    return;
+  }
+
   if (command === "-h" || command === "--help" || command === "help") {
     process.stdout.write(USAGE);
     return;
@@ -123,7 +139,8 @@ main().catch((error: unknown) => {
   // An unknown or malformed flag is worth the option list; a refusal is not.
   const code = (error as NodeJS.ErrnoException).code ?? "";
   if (code.startsWith("ERR_PARSE_ARGS")) {
-    process.stderr.write(`\n${process.argv[2] === "approve-builder" ? APPROVE_USAGE : INIT_USAGE}`);
+    const usages: Record<string, string> = { "approve-builder": APPROVE_USAGE, stats: STATS_USAGE };
+    process.stderr.write(`\n${usages[process.argv[2] ?? ""] ?? INIT_USAGE}`);
   }
   // Not process.exit(): approve-builder may still be closing its server, and
   // exiting mid-close aborts Node on Windows. Nothing else is left running.

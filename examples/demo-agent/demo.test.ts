@@ -163,7 +163,6 @@ describe("buildServerEnv", () => {
     maxLeverage: 3,
     maxOrdersPerMin: 6,
     paperBalanceUsd: 10_000,
-    builderFeeTenthsBps: 10,
     requireStopLoss: true,
     paperFile: "/data/paper.json",
     logFile: "/data/decisions.jsonl",

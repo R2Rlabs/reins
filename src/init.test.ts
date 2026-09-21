@@ -67,51 +67,22 @@ describe("parseInitArgs", () => {
 });
 
 describe("the builder fee", () => {
-  const address = "0x1111111111111111111111111111111111111111";
-
-  it("is only ever empty or a correctly checksummed address", () => {
+  it("is paid to a correctly checksummed address", () => {
     // A mistyped character here would pay the fees to nobody. The mixed-case
     // checksum catches that; lowercase would not.
-    if (REINS_BUILDER_ADDRESS !== "") {
-      expect(getAddress(REINS_BUILDER_ADDRESS)).toBe(REINS_BUILDER_ADDRESS);
-    }
-  });
-
-  it("defaults to 2 bp, in tenths as Hyperliquid wants it", () => {
-    expect(parseInitArgs([]).builderFeeTenthsBps).toBe(20);
+    expect(getAddress(REINS_BUILDER_ADDRESS)).toBe(REINS_BUILDER_ADDRESS);
     expect(DEFAULT_BUILDER_FEE_TENTHS_BPS).toBe(20);
   });
 
-  it("takes a fee in basis points, down to 0.1 bp", () => {
-    expect(parseInitArgs(["--builder-fee", "2.5"]).builderFeeTenthsBps).toBe(25);
-    expect(parseInitArgs(["--builder-fee", "1.1"]).builderFeeTenthsBps).toBe(11);
-    expect(parseInitArgs(["--builder-fee", "10"]).builderFeeTenthsBps).toBe(100);
+  it("cannot be switched off or changed from init", () => {
+    expect(() => parseInitArgs(["--no-builder-fee"])).toThrow();
+    expect(() => parseInitArgs(["--builder-fee", "0"])).toThrow();
   });
 
-  it.each([
-    [["--builder-fee", "10.5"], /at most 10 bp/],
-    [["--builder-fee", "1.25"], /steps of 0.1 bp/],
-    [["--builder-fee", "0"], /positive number/],
-    [["--builder-fee", "2", "--no-builder-fee"], /contradict/],
-  ])("rejects %j", (argv, message) => {
-    expect(() => parseInitArgs(argv)).toThrow(message);
-  });
-
-  it("goes into the entry when there is an address to pay", () => {
-    const entry = serverEntry(parseInitArgs([]), node, cwd, address);
-    expect(entry.env).toMatchObject({
-      REINS_BUILDER_ADDRESS: address,
-      REINS_BUILDER_FEE_TENTHS_BPS: "20",
-    });
-  });
-
-  it("is left out with --no-builder-fee, or while there is no address", () => {
-    const optedOut = serverEntry(parseInitArgs(["--no-builder-fee"]), node, cwd, address);
-    const noAddress = serverEntry(parseInitArgs([]), node, cwd, "");
-    for (const entry of [optedOut, noAddress]) {
-      expect(entry.env).not.toHaveProperty("REINS_BUILDER_ADDRESS");
-      expect(entry.env).not.toHaveProperty("REINS_BUILDER_FEE_TENTHS_BPS");
-    }
+  it("is not a setting in the entry, where it could be edited out", () => {
+    const entry = serverEntry(parseInitArgs([]), node, cwd);
+    expect(entry.env).not.toHaveProperty("REINS_BUILDER_ADDRESS");
+    expect(entry.env).not.toHaveProperty("REINS_BUILDER_FEE_TENTHS_BPS");
   });
 });
 
@@ -230,17 +201,12 @@ describe("runInit", () => {
     expect(files[path]).toBe(before);
   });
 
-  it("says when a builder fee is on and how to remove it", async () => {
+  it("says up front what the fee is and how live trading approves it", async () => {
     const { deps, output } = fakeDeps();
-    await runInit(["--builder-fee", "2"], { ...deps, builderAddress: "0x2222222222222222222222222222222222222222" });
+    await runInit([], deps);
     expect(output()).toContain("✓ Builder fee — 2 bp to Reins on live orders; paper results include it");
-    expect(output()).toContain("--no-builder-fee");
-  });
-
-  it("says nothing about a fee when none is charged", async () => {
-    const { deps, output } = fakeDeps();
-    await runInit([], { ...deps, builderAddress: "" });
-    expect(output()).not.toContain("Builder fee");
+    expect(output()).toContain("Live trading needs a one-time approval: npx @r2rlabs/reins approve-builder");
+    expect(output()).not.toContain("--no-builder-fee");
   });
 
   it("--print writes no file", async () => {

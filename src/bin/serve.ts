@@ -7,7 +7,8 @@
  * connection in ways that are miserable to diagnose. All logging goes to stderr.
  */
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
-import { HyperliquidClient, type BuilderConfig } from "../client.js";
+import { REINS_BUILDER, feeApprovalProblem } from "../builder-fee.js";
+import { HyperliquidClient } from "../client.js";
 import { MemoryDecisionLog, type DecisionLog } from "../decision-log.js";
 import { FileDecisionLog } from "../decision-log-file.js";
 import { createMcpServer } from "../mcp-server.js";
@@ -58,12 +59,6 @@ function flag(name: string): boolean {
   throw new Error(`${name} must be true or false, got "${process.env[name]}".`);
 }
 
-function readBuilder(): BuilderConfig | undefined {
-  const address = process.env["REINS_BUILDER_ADDRESS"];
-  if (!address) return undefined;
-  return { address, feeTenthsBps: num("REINS_BUILDER_FEE_TENTHS_BPS", 10) };
-}
-
 async function main(): Promise<void> {
   const network = (process.env["REINS_NETWORK"] ?? "testnet") as Network;
   if (network !== "testnet" && network !== "mainnet") {
@@ -78,7 +73,9 @@ async function main(): Promise<void> {
   }
 
   const limits = readLimits();
-  const builder = readBuilder();
+  // Reins' builder fee is part of the product, not a setting. Real orders carry
+  // it on mainnet; testnet moves no real money, so its orders carry none.
+  const builder = network === "mainnet" ? REINS_BUILDER : undefined;
 
   // Only live mode ever holds a key. Paper never signs anything, so it is not
   // given the means to.
@@ -106,7 +103,8 @@ async function main(): Promise<void> {
     client = new PaperClient({
       market,
       startingBalanceUsd: balance,
-      ...(builder ? { builderFeeTenthsBps: builder.feeTenthsBps } : {}),
+      // Paper pays nothing, but shows the fee, so a run says what live would cost.
+      builderFeeTenthsBps: REINS_BUILDER.feeTenthsBps,
       ...(file ? { store: new FilePaperStore(file) } : {}),
     });
     banner =
@@ -114,6 +112,12 @@ async function main(): Promise<void> {
       `  opening balance $${balance.toLocaleString()}\n` +
       `  state           ${file ?? "in memory (lost on restart)"}\n`;
   } else if (signer) {
+    // Hyperliquid refuses orders carrying a fee the account has not approved;
+    // refuse here first, with the way to approve it.
+    if (builder) {
+      const problem = await feeApprovalProblem(market, account ?? signer.address);
+      if (problem) throw new Error(problem);
+    }
     client = market;
     const warning =
       network === "mainnet"
@@ -149,7 +153,13 @@ async function main(): Promise<void> {
       `  max leverage    ${limits.maxLeverage}x\n` +
       `  stop-losses     ${limits.requireStopLoss ? "required on every position" : "optional"}\n` +
       `  symbols         ${limits.symbolAllowlist.join(", ")}\n` +
-      `  builder code    ${builder ? `${builder.feeTenthsBps / 10} bp` : "none"}\n` +
+      `  builder fee     ${
+        mode === "paper"
+          ? `${REINS_BUILDER.feeTenthsBps / 10} bp, shown in paper results; charged on live mainnet orders`
+          : builder
+            ? `${REINS_BUILDER.feeTenthsBps / 10} bp on every order`
+            : "none on testnet"
+      }\n` +
       `  decision log    ${logFile ?? "in memory (lost on restart)"}\n`,
   );
 
@@ -159,5 +169,7 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   process.stderr.write(`reins failed to start: ${message}\n`);
-  process.exit(1);
+  // Not process.exit(): exiting while a request's socket is still closing
+  // aborts Node on Windows. Nothing else is running, so the process ends.
+  process.exitCode = 1;
 });
