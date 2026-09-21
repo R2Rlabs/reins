@@ -23,6 +23,7 @@ function fakeExchange(overrides: Partial<Record<string, unknown>> = {}) {
     restingOutcome: undefined as OrderOutcome | undefined,
     fillSize: undefined as number | undefined,
     cancelFails: false,
+    equityDriftWhileOpen: 0,
     ...overrides,
   } as {
     equity: number;
@@ -30,13 +31,18 @@ function fakeExchange(overrides: Partial<Record<string, unknown>> = {}) {
     restingOutcome?: OrderOutcome;
     fillSize?: number;
     cancelFails: boolean;
+    equityDriftWhileOpen: number;
   };
 
   const client: LiveCheckClient = {
     accountAddress: ACCOUNT,
     isReadOnly: false,
     assetInfo: async (symbol) => ({ name: symbol, szDecimals: 5, index: 0 }),
-    accountState: async () => ({ accountValueUsd: state.equity, realizedPnlTodayUsd: 0, positionsUsd: {} }),
+    accountState: async () => ({
+      accountValueUsd: state.equity + (position > 0 ? state.equityDriftWhileOpen : 0),
+      realizedPnlTodayUsd: 0,
+      positionsUsd: position > 0 ? { BTC: position * 81_000 } : {},
+    }),
     openPositions: async () => (position > 0 ? { BTC: { size: position, entryPrice: 81_000 } } : {}),
     l2Book: async () => ({ levels: [[{ px: "81000" }], [{ px: "81001" }]] }),
     stopLosses: async () => [...stops],
@@ -138,6 +144,7 @@ describe("the trading checks", () => {
       "✓ resting order with a stop attached",
       "✓ cancel",
       "✓ market entry",
+      "✓ account value with a position open",
       "✓ stop-loss on the position",
       "✓ move the stop",
       "✓ close the position",
@@ -148,7 +155,7 @@ describe("the trading checks", () => {
     expect(calls).toContain("place:buy:Ioc");
     expect(position()).toBe(0);
     expect(stopsLeft()).toEqual([]);
-    expect(out()).toContain("All 11 checks passed.");
+    expect(out()).toContain("All 12 checks passed.");
   });
 
   it("fails loudly when a post-only order is refused instead of resting", async () => {
@@ -167,6 +174,23 @@ describe("the trading checks", () => {
     expect(results.find((r) => r.name === "market entry")).toMatchObject({ ok: false });
     expect(results.some((r) => r.name === "stop-loss on the position")).toBe(false);
     expect(calls.filter((c) => c === "stop")).toHaveLength(0);
+  });
+
+  it("catches equity that jumps when a position opens, and still closes it", async () => {
+    // A Unified account read as if it were Manual would lose, or double, the margin.
+    const { client, position } = fakeExchange({ equityDriftWhileOpen: -1.2 });
+    const results = await runLiveCheck(["--trade"], deps(client).d);
+    const check = results.find((r) => r.name === "account value with a position open")!;
+    expect(check.ok).toBe(false);
+    expect(check.detail).toMatch(/misreading this account.s equity/);
+    expect(results.find((r) => r.name === "close the position")).toMatchObject({ ok: true });
+    expect(position()).toBe(0);
+  });
+
+  it("allows for fees and a few seconds of price", async () => {
+    const { client } = fakeExchange({ equityDriftWhileOpen: -0.1 });
+    const results = await runLiveCheck(["--trade"], deps(client).d);
+    expect(results.find((r) => r.name === "account value with a position open")).toMatchObject({ ok: true });
   });
 
   it("reports leftover stops it could not cancel", async () => {

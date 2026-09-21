@@ -97,6 +97,7 @@ function setup(options: { fills?: unknown; limits?: RiskLimits; states?: unknown
   const transport = new MockTransport()
     .reply("info:meta", META)
     .reply("info:clearinghouseState", ...(options.states ?? [STATE]))
+    .reply("info:userAbstraction", "disabled")
     .reply("info:userFills", options.fills ?? [])
     .reply("info:l2Book", BOOK)
     .reply("info:frontendOpenOrders", options.openOrders ?? [])

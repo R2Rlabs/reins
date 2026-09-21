@@ -64,6 +64,13 @@ address the account looks empty. The startup banner names both. Hyperliquid
 prunes API wallets that expire or are replaced; make a fresh one rather than
 reusing an old address.
 
+Every account mode works. Hyperliquid starts new accounts in **Unified**,
+where the USDC sits in the spot balance and the perps account reads $0; Reins
+asks the account which mode it is in and, for Unified and Portfolio margin,
+takes equity from the USDC balance plus the positions' unrealized PnL. Manual
+accounts are read from perps as before. (A *builder* address is different: it
+must be in Manual — `standard` — to earn fees.)
+
 Defaults are deliberately safe: `REINS_MODE` is `paper` and `REINS_NETWORK` is
 `testnet`, so trading real funds takes two explicit changes rather than one
 forgotten variable. Live mode without a key stays read-only instead of failing

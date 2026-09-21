@@ -258,6 +258,27 @@ export async function runLiveCheck(argv: string[], deps: LiveCheckDeps): Promise
   });
 
   if (entryOk) {
+    // Equity is read differently in Manual and Unified accounts, and only an
+    // open position tells the two readings apart: one that counts the margin
+    // twice, or loses it, moves by the margin the moment the entry fills.
+    // Fees and a few seconds of price stay well inside this allowance.
+    await step("account value with a position open", async () => {
+      const state = await client.accountState();
+      const notional = state.positionsUsd[opts.symbol] ?? 0;
+      expect(
+        notional > opts.sizeUsd * 0.8 && notional < opts.sizeUsd * 1.2,
+        `expected about $${opts.sizeUsd} of ${opts.symbol} long, Reins reads $${notional.toFixed(2)}.`,
+      );
+      const allowance = opts.sizeUsd * 0.01 + 0.05;
+      const moved = state.accountValueUsd - equity;
+      expect(
+        Math.abs(moved) <= allowance,
+        `account value went from $${equity.toFixed(2)} to $${state.accountValueUsd.toFixed(2)} on opening ` +
+          `$${notional.toFixed(2)}; more than fees and price explain, so Reins is misreading this account's equity.`,
+      );
+      return `$${state.accountValueUsd.toFixed(2)} with $${notional.toFixed(2)} ${opts.symbol} open (moved ${moved >= 0 ? "+" : "-"}$${Math.abs(moved).toFixed(2)})`;
+    });
+
     let stopOid: number | undefined;
     const stopOk = await step("stop-loss on the position", async () => {
       const outcome = await client.placeStopLoss({

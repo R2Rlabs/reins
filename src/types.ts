@@ -43,6 +43,25 @@ export interface ClearinghouseState {
   withdrawable: string;
 }
 
+export interface SpotBalance {
+  coin: string;
+  /** 0 is USDC. */
+  token: number;
+  total: string;
+  hold: string;
+}
+
+export interface SpotClearinghouseState {
+  balances: SpotBalance[];
+}
+
+/**
+ * What `userAbstraction` answers. In `unifiedAccount` and `portfolioMargin`
+ * the collateral sits in the spot balances and the perps clearinghouse holds
+ * none of it; `disabled` (Manual in the app) and `default` keep them apart.
+ */
+export type AccountAbstraction = "unifiedAccount" | "portfolioMargin" | "disabled" | "default" | "dexAbstraction";
+
 export interface BookLevel {
   px: string;
   sz: string;

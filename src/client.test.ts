@@ -64,7 +64,7 @@ let transport: MockTransport;
 let signer: StubSigner;
 
 beforeEach(() => {
-  transport = new MockTransport().reply("info:meta", META);
+  transport = new MockTransport().reply("info:meta", META).reply("info:userAbstraction", "disabled");
   signer = new StubSigner();
 });
 
@@ -373,6 +373,56 @@ describe("account state", () => {
     expect(snapshot.positionsUsd["ETH"]).toBeCloseTo(-100.02765, 5);
     expect(snapshot.positionsUsd["BTC"]).toBeCloseTo(12_500, 5);
     expect(snapshot.accountValueUsd).toBeCloseTo(13_109.482328, 5);
+  });
+
+  describe("in a Unified account", () => {
+    // What the builder account returned on mainnet, 2026-09-21, while Unified:
+    // perps reads $0 and the deposit sits in spot.
+    const EMPTY_PERPS: ClearinghouseState = {
+      assetPositions: [],
+      marginSummary: { accountValue: "0.0", totalMarginUsed: "0.0", totalNtlPos: "0.0", totalRawUsd: "0.0" },
+      withdrawable: "0.0",
+    };
+    const spot = (usdc: string) => ({
+      balances: [
+        { coin: "USDC", token: 0, total: usdc, hold: "0.0", entryNtl: "0.0" },
+        { coin: "USDE", token: 235, total: "0.0", hold: "0.0", entryNtl: "0.0" },
+        { coin: "HYPE", token: 150, total: "3.0", hold: "0.0", entryNtl: "280.0" },
+      ],
+    });
+
+    beforeEach(() => {
+      transport = new MockTransport().reply("info:meta", META).reply("info:userAbstraction", "unifiedAccount");
+    });
+
+    it("reads equity from the USDC spot balance, not the empty perps account", async () => {
+      transport.reply("info:clearinghouseState", EMPTY_PERPS).reply("info:spotClearinghouseState", spot("104.8"));
+      expect((await client().positionSnapshot()).accountValueUsd).toBeCloseTo(104.8, 6);
+    });
+
+    it("adds the positions' unrealized PnL, and ignores what perps calls account value", async () => {
+      transport.reply("info:clearinghouseState", STATE).reply("info:spotClearinghouseState", spot("1000"));
+      const snapshot = await client().positionSnapshot();
+      expect(snapshot.accountValueUsd).toBeCloseTo(1000 + 35.5 - 0.0134, 6);
+      expect(snapshot.positionsUsd["BTC"]).toBeCloseTo(12_500, 5);
+    });
+
+    it("treats Portfolio margin the same way", async () => {
+      transport = new MockTransport().reply("info:meta", META).reply("info:userAbstraction", "portfolioMargin");
+      transport.reply("info:clearinghouseState", EMPTY_PERPS).reply("info:spotClearinghouseState", spot("250"));
+      expect((await client().positionSnapshot()).accountValueUsd).toBeCloseTo(250, 6);
+    });
+
+    it("reads $0 when there is no USDC at all", async () => {
+      transport.reply("info:clearinghouseState", EMPTY_PERPS).reply("info:spotClearinghouseState", { balances: [] });
+      expect((await client().positionSnapshot()).accountValueUsd).toBe(0);
+    });
+  });
+
+  it("does not read spot balances for a Manual account", async () => {
+    transport.reply("info:clearinghouseState", STATE);
+    await client().positionSnapshot();
+    expect(transport.callsTo("info:spotClearinghouseState")).toHaveLength(0);
   });
 
   it("lowercases the user address in the request", async () => {

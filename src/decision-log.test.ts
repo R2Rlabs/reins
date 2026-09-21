@@ -70,6 +70,7 @@ function setup(log?: DecisionLog) {
   const transport = new MockTransport()
     .reply("info:meta", META)
     .reply("info:clearinghouseState", STATE)
+    .reply("info:userAbstraction", "disabled")
     .reply("info:userFills", [])
     .reply("info:l2Book", BOOK)
     .reply("exchange:order", {

@@ -9,7 +9,9 @@ import {
   type Candle,
   type CandleInterval,
   type CancelOutcome,
+  type AccountAbstraction,
   type ClearinghouseState,
+  type SpotClearinghouseState,
   type ExchangeRequest,
   type ExchangeResponse,
   type Fill,
@@ -90,6 +92,9 @@ export interface PlaceOrderParams {
 
 /** Perps builder fees are capped at 0.1%, or 100 tenths of a basis point. */
 export const MAX_PERP_BUILDER_FEE_TENTHS_BPS = 100;
+
+/** USDC's token index in the spot balances. */
+const USDC_TOKEN = 0;
 
 export class ReadOnlyClientError extends Error {
   constructor() {
@@ -192,27 +197,60 @@ export class HyperliquidClient {
   }
 
   async clearinghouseState(user?: string): Promise<ClearinghouseState> {
+    return this.postInfo<ClearinghouseState>({
+      type: "clearinghouseState",
+      user: this.requireAddress(user).toLowerCase(),
+    });
+  }
+
+  private requireAddress(user?: string): string {
     const address = user ?? this.accountAddress;
     if (!address) {
       throw new Error("No user address given, and this client has neither an account nor a signer.");
     }
-    return this.postInfo<ClearinghouseState>({
-      type: "clearinghouseState",
-      user: address.toLowerCase(),
+    return address;
+  }
+
+  async spotClearinghouseState(user?: string): Promise<SpotClearinghouseState> {
+    return this.postInfo<SpotClearinghouseState>({
+      type: "spotClearinghouseState",
+      user: this.requireAddress(user).toLowerCase(),
+    });
+  }
+
+  /** The account's mode: Unified, Portfolio margin, or Manual (`disabled`). */
+  async accountAbstraction(user?: string): Promise<AccountAbstraction> {
+    return this.postInfo<AccountAbstraction>({
+      type: "userAbstraction",
+      user: this.requireAddress(user).toLowerCase(),
     });
   }
 
   /**
    * Positions and equity in the shape the risk engine consumes. `positionValue`
    * is unsigned on the wire, so the direction is taken from `szi`.
+   *
+   * Equity depends on the account's mode. In Manual it is the perps account
+   * value. In Unified and Portfolio margin — Unified is what the app gives a
+   * new account — the collateral lives in the spot balances and perps reads
+   * $0, so equity is the USDC balance plus the positions' unrealized PnL.
+   * Other collateral a Portfolio-margin account may hold is left out: equity
+   * is understated, which only ever makes the limits stricter.
    */
   async positionSnapshot(user?: string): Promise<PositionSnapshot> {
-    const state = await this.clearinghouseState(user);
+    const [state, mode] = await Promise.all([this.clearinghouseState(user), this.accountAbstraction(user)]);
     const positionsUsd: Record<string, number> = {};
+    let unrealizedUsd = 0;
     for (const { position } of state.assetPositions) {
       const notional = Math.abs(Number(position.positionValue));
       const direction = Number(position.szi) < 0 ? -1 : 1;
       positionsUsd[position.coin] = direction * notional;
+      unrealizedUsd += Number(position.unrealizedPnl);
+    }
+    if (mode === "unifiedAccount" || mode === "portfolioMargin") {
+      const spot = await this.spotClearinghouseState(user);
+      const usdc = spot.balances.find((b) => b.token === USDC_TOKEN);
+      return { positionsUsd, accountValueUsd: Number(usdc?.total ?? 0) + unrealizedUsd };
     }
     return {
       positionsUsd,
