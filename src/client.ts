@@ -514,6 +514,19 @@ export class HyperliquidClient {
   }
 
   /**
+   * Builder fees credited to `builder` so far, in USDC, claimed or not.
+   * Hyperliquid's own running total: unlike the daily fill files, it is never
+   * late, so it answers "has anyone traded through this builder code yet".
+   */
+  async builderRewardsUsd(builder: string): Promise<number> {
+    const { builderRewards } = await this.postInfo<{ builderRewards?: string }>({
+      type: "referral",
+      user: builder.toLowerCase(),
+    });
+    return Number(builderRewards ?? 0);
+  }
+
+  /**
    * Sends an ApproveBuilderFee the user already signed in their own wallet.
    * This client's signer plays no part — the approval must come from the
    * user's main wallet, which Reins never holds.

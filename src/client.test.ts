@@ -435,6 +435,21 @@ describe("account state", () => {
   });
 });
 
+describe("builderRewardsUsd", () => {
+  it("reads Hyperliquid running total of fees credited to a builder", async () => {
+    transport.reply("info:referral", {
+      referredBy: null, cumVlm: "0.0", unclaimedRewards: "0.009477", claimedRewards: "0.0", builderRewards: "0.009477",
+    });
+    expect(await client().builderRewardsUsd("0x658DC3a1fc753262c83c7345032E6DB7Aa8fA997")).toBeCloseTo(0.009477, 9);
+    expect(transport.lastCall?.body["user"]).toBe("0x658dc3a1fc753262c83c7345032e6db7aa8fa997");
+  });
+
+  it("reads zero from an account that has never earned any", async () => {
+    transport.reply("info:referral", { referredBy: null, cumVlm: "0.0" });
+    expect(await client().builderRewardsUsd("0x1111111111111111111111111111111111111111")).toBe(0);
+  });
+});
+
 describe("fillsSince", () => {
   // Shapes from the live test on mainnet, 2026-09-21. A fill does not say it
   // came from a stop; the order history does.

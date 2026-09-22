@@ -129,6 +129,39 @@ describe("runStats", () => {
     expect(out).toMatch(/2026-09-20\s+1\s+1\s+2/);
   });
 
+  it("reports the fees Hyperliquid has credited, even with no daily files yet", async () => {
+    const fetchBytes: FetchBytes = async () => ({ status: 403, bytes: new Uint8Array() });
+    let out = "";
+    const stats = await runStats(["--days", "2"], {
+      fetchBytes,
+      feesCredited: async (builder) => (builder.startsWith("0x658") ? 0.009477 : 0),
+      now: () => NOW,
+      out: (t) => (out += t),
+    });
+
+    expect(stats?.feesCreditedUsd).toBeCloseTo(0.009477, 9);
+    expect(out).toContain("Fees credited $0.0095 in total, all time");
+    expect(out).toContain("No daily file for those days yet");
+  });
+
+  it("still reports the days when the credited total cannot be read", async () => {
+    const csv = [HEADER, row(A, "BTC", 84114, 0.00014, 0.002355)].join("\n");
+    let out = "";
+    const stats = await runStats(["--days", "1"], {
+      fetchBytes: async () => ({ status: 200, bytes: frame({ raw: true, data: ascii(csv) }) }),
+      feesCredited: async () => {
+        throw new Error("Hyperliquid is down");
+      },
+      now: () => NOW,
+      out: (t) => (out += t),
+    });
+
+    expect(stats).toMatchObject({ trades: 1 });
+    expect(stats?.feesCreditedUsd).toBeUndefined();
+    expect(out).not.toContain("Fees credited");
+    expect(out).toContain("Trades        1");
+  });
+
   it("stops on an answer that is neither a file nor a missing day", async () => {
     const fetchBytes: FetchBytes = async () => ({ status: 500, bytes: new Uint8Array() });
     await expect(runStats(["--days", "1"], { fetchBytes, now: () => NOW, out: () => {} })).rejects.toThrow(/answered 500/);

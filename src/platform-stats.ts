@@ -124,6 +124,12 @@ export interface PlatformStats {
   stopsFired: number;
   markets: { coin: string; volumeUsd: number }[];
   byDay: DayStats[];
+  /**
+   * Fees Hyperliquid has credited this builder in total, claimed or not.
+   * Independent of the daily files, which can be a day or more late, so it is
+   * the figure to trust when a day is missing. Absent if the lookup failed.
+   */
+  feesCreditedUsd?: number;
 }
 
 /** `days` oldest first; a day with no file is simply absent. */
@@ -204,6 +210,8 @@ export function lastDays(count: number, now: number): string[] {
 
 export interface StatsDeps {
   fetchBytes: FetchBytes;
+  /** Hyperliquid's running total of fees credited to the builder. */
+  feesCredited?: (builder: string) => Promise<number>;
   now: () => number;
   out: (text: string) => void;
 }
@@ -223,6 +231,15 @@ export async function runStats(argv: string[], deps: StatsDeps): Promise<Platfor
     batch.forEach((date, j) => days.push({ date, fills: fetched[j]! }));
   }
   const stats = summarizeFills(opts.builder, { from: dates[0]!, to: dates.at(-1)! }, days);
+  if (deps.feesCredited) {
+    // Never fatal: the daily files are the point of the command, and this is
+    // a second opinion on top of them.
+    try {
+      stats.feesCreditedUsd = await deps.feesCredited(opts.builder);
+    } catch {
+      // Left absent, and the report simply does not show the total.
+    }
+  }
   deps.out(opts.json ? `${JSON.stringify(stats, null, 2)}\n` : formatStats(stats));
   return stats;
 }
@@ -237,8 +254,15 @@ export function formatStats(s: PlatformStats): string {
     `${s.from} to ${s.to} (UTC); a day appears once it has closed`,
     "",
   ];
+  if (s.feesCreditedUsd !== undefined) {
+    lines.push(`Fees credited ${usd(s.feesCreditedUsd)} in total, all time — Hyperliquid's own running count`, "");
+  }
   if (s.trades === 0) {
-    lines.push("No trades carried this builder code in that time.");
+    lines.push(
+      s.feesCreditedUsd
+        ? "No daily file for those days yet. Hyperliquid publishes one after a day closes, sometimes a day or more late; the total above is what it has credited."
+        : "No trades carried this builder code in that time.",
+    );
     return `${lines.join("\n")}\n`;
   }
   lines.push(

@@ -111,6 +111,7 @@ async function main(): Promise<void> {
 
   if (command === "stats") {
     await runStats(rest, {
+      feesCredited: (builder) => new HyperliquidClient({ network: "mainnet" }).builderRewardsUsd(builder),
       fetchBytes: async (url) => {
         const response = await fetch(url);
         return { status: response.status, bytes: new Uint8Array(await response.arrayBuffer()) };

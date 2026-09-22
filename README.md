@@ -52,7 +52,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 367 tests, no network calls in any of them.
+Early, but real. 371 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -64,7 +64,7 @@ Early, but real. 367 tests, no network calls in any of them.
 | `src/trading-client.ts` | The interface live and paper both satisfy |
 | `src/decision-log.ts` | Append-only record of every attempt and its stated reason |
 | `src/decision-log-file.ts` | JSON Lines log on disk |
-| `src/bin/cli.ts` | The `reins` command: `serve` (default), `init`, `approve-builder` and `live-check` |
+| `src/bin/cli.ts` | The `reins` command: `serve` (default), `init`, `approve-builder`, `live-check` and `stats` |
 | `src/bin/serve.ts` | stdio entry point |
 | `src/init.ts` | `reins init` — writes a paper-mode server entry into `.mcp.json` |
 | `src/builder-fee.ts` | Reins' builder fee, and the approval live trading needs before it starts |
@@ -358,8 +358,11 @@ npx @r2rlabs/reins stats --days 365 --json
 Hyperliquid publishes every fill that carried a builder code in a daily file,
 once the UTC day has closed. `stats` reads those files for Reins' builder
 address and reports accounts (and new ones by day), trades, volume, fees
-earned, maker fills, stops fired and the busiest markets. Reins itself sends
-nothing home, so this is live mainnet trading only: paper runs leave no trace.
+earned, maker fills, stops fired and the busiest markets. It also prints the
+fees Hyperliquid has credited the builder in total, which comes from the API
+rather than the files and is never late: a day's file can arrive a day or more
+after the day closes. Reins itself sends nothing home, so this is live mainnet
+trading only: paper runs leave no trace.
 
 ### Approving the fee
 
