@@ -1,0 +1,87 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.R2Rlabs/reins",
+  "title": "Reins",
+  "description": "Risk limits and an audit log for AI agents trading Hyperliquid, enforced outside the model.",
+  "websiteUrl": "https://www.npmjs.com/package/@r2rlabs/reins",
+  "version": "0.1.4",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@r2rlabs/reins",
+      "version": "0.1.4",
+      "runtimeHint": "npx",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "REINS_SYMBOLS",
+          "description": "Markets the agent may trade, comma separated, e.g. BTC,ETH. Every other market is refused.",
+          "isRequired": true,
+          "format": "string",
+          "placeholder": "BTC,ETH"
+        },
+        {
+          "name": "REINS_MAX_POSITION_USD",
+          "description": "Largest position per market, in USD.",
+          "isRequired": true,
+          "format": "number",
+          "placeholder": "5000"
+        },
+        {
+          "name": "REINS_DAILY_LOSS_USD",
+          "description": "Realised loss in a UTC day after which new risk is refused.",
+          "isRequired": true,
+          "format": "number",
+          "placeholder": "500"
+        },
+        {
+          "name": "REINS_MAX_LEVERAGE",
+          "description": "Largest total exposure as a multiple of account value.",
+          "format": "number",
+          "default": "3"
+        },
+        {
+          "name": "REINS_MODE",
+          "description": "paper (live prices, simulated fills, nothing signed) or live.",
+          "format": "string",
+          "default": "paper",
+          "choices": ["paper", "live"]
+        },
+        {
+          "name": "REINS_NETWORK",
+          "description": "Hyperliquid network for prices and, in live mode, orders. Mainnet spends real money.",
+          "format": "string",
+          "default": "testnet",
+          "choices": ["testnet", "mainnet"]
+        },
+        {
+          "name": "REINS_REQUIRE_STOP_LOSS",
+          "description": "true to refuse any order that adds risk without a stop-loss.",
+          "format": "boolean",
+          "default": "false"
+        },
+        {
+          "name": "REINS_LOG_FILE",
+          "description": "Decision log, one JSON line per action with the agent's stated reason. In memory if unset.",
+          "format": "filepath"
+        },
+        {
+          "name": "REINS_PAPER_FILE",
+          "description": "Where the paper account is kept between runs. In memory if unset.",
+          "format": "filepath"
+        },
+        {
+          "name": "REINS_ACCOUNT_ADDRESS",
+          "description": "Live mode: the Hyperliquid account traded. Approve Reins' 2 bp builder fee from it first: npx @r2rlabs/reins approve-builder",
+          "format": "string"
+        },
+        {
+          "name": "REINS_PRIVATE_KEY",
+          "description": "Live mode: an API wallet's key, which can trade but not withdraw. Never the account's own key.",
+          "format": "string",
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

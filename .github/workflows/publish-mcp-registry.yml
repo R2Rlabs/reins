@@ -1,0 +1,44 @@
+# Lists Reins in the official MCP Registry (registry.modelcontextprotocol.io)
+# from server.json. Run it by hand from the Actions tab after each npm release:
+# the registry checks that the npm package named in server.json exists at that
+# version and carries a matching mcpName.
+#
+# No secrets: GitHub's OIDC token proves to the registry that this repository
+# belongs to R2Rlabs, which is what the io.github.R2Rlabs/ namespace requires.
+name: Publish to MCP Registry
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Check server.json matches package.json
+        run: |
+          node -e '
+            const s = require("./server.json"), p = require("./package.json");
+            const problems = [];
+            if (s.name !== p.mcpName) problems.push(`name ${s.name} != mcpName ${p.mcpName}`);
+            if (s.version !== p.version) problems.push(`version ${s.version} != ${p.version}`);
+            if (s.packages[0].version !== p.version) problems.push(`package version ${s.packages[0].version} != ${p.version}`);
+            if (problems.length) { console.error(problems.join("\n")); process.exit(1); }
+            console.log(`Publishing ${s.name} ${s.version}`);
+          '
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: Authenticate to MCP Registry
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish server to MCP Registry
+        run: ./mcp-publisher publish

@@ -11,3 +11,8 @@ demo-data/
 
 # Packages made to copy the demo to a server.
 *.tar.gz
+
+# The MCP Registry publisher, if downloaded locally.
+mcp-publisher.exe
+mcp-publisher.tar.gz
+mcp-publisher
