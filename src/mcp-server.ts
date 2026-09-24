@@ -447,6 +447,24 @@ export function placeOrder(
       return fail("A reduce-only order closes risk; it takes no stopLoss.");
     }
 
+    // Before anything is priced: a symbol nobody may trade should be told so,
+    // not handed a complaint about its stop-loss.
+    const allowlist = deps.engine.configuredLimits.symbolAllowlist;
+    if (!allowlist.includes(args.symbol)) {
+      const decision = {
+        allowed: false,
+        code: "SYMBOL_NOT_ALLOWED",
+        reason: `${args.symbol} is not on the allowlist (${allowlist.join(", ") || "empty"}).`,
+      } as const;
+      const record = startRecord(deps, "place_order", args.reason, {
+        symbol: args.symbol,
+        side: args.side,
+        sizeUsd: args.sizeUsd,
+      });
+      record.risk = riskOf(decision);
+      return blocked(decision, await recordSafely(deps, record));
+    }
+
     const limitPrice =
       explicitPrice ??
       marketablePrice(await deps.client.l2Book(args.symbol), args.side, buffer(deps));

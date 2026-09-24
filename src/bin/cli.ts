@@ -20,6 +20,8 @@ import { HyperliquidClient } from "../client.js";
 import { DEFAULT_BUILDER_FEE_TENTHS_BPS, INIT_USAGE, REINS_BUILDER_ADDRESS, runInit } from "../init.js";
 import { runLiveCheck } from "../live-check.js";
 import { STATS_USAGE, runStats } from "../platform-stats.js";
+import { buildRuntime } from "../runtime.js";
+import { HTTP_USAGE, parseHttpArgs, startHttpServer } from "./http.js";
 import { PrivateKeySigner } from "../private-key-signer.js";
 
 /** Stands in when this build has no builder address, so orders still carry the shape. */
@@ -32,6 +34,7 @@ Commands:
   init             Add a paper-trading Reins server to .mcp.json
   approve-builder  Approve Reins' builder fee, signed in your own wallet
   live-check       Check Reins against real Hyperliquid, on a live account
+  http             Serve the same tools over HTTP, for bots in any language
   stats            Accounts, trades, volume and fees through Reins' builder code
 
 Run "reins <command> --help" for a command's options.
@@ -109,6 +112,25 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (command === "http") {
+    const options = parseHttpArgs(rest, process.env);
+    if (options.help) {
+      process.stdout.write(HTTP_USAGE);
+      return;
+    }
+    const { client, engine, log, banner, mode, network } = await buildRuntime();
+    const server = startHttpServer({ client, engine, log }, options, { mode, network });
+    server.listen(options.port, options.host, () => {
+      process.stderr.write(
+        `${banner}  http            http://${options.host}:${options.port}\n` +
+          `  token           ${options.token}\n` +
+          `\nSend it with every request: Authorization: Bearer ${options.token}\n` +
+          `Try: curl -H "Authorization: Bearer ${options.token}" http://${options.host}:${options.port}/limits\n`,
+      );
+    });
+    return;
+  }
+
   if (command === "stats") {
     await runStats(rest, {
       feesCredited: (builder) => new HyperliquidClient({ network: "mainnet" }).builderRewardsUsd(builder),
@@ -140,7 +162,7 @@ main().catch((error: unknown) => {
   // An unknown or malformed flag is worth the option list; a refusal is not.
   const code = (error as NodeJS.ErrnoException).code ?? "";
   if (code.startsWith("ERR_PARSE_ARGS")) {
-    const usages: Record<string, string> = { "approve-builder": APPROVE_USAGE, stats: STATS_USAGE };
+    const usages: Record<string, string> = { "approve-builder": APPROVE_USAGE, stats: STATS_USAGE, http: HTTP_USAGE };
     process.stderr.write(`\n${usages[process.argv[2] ?? ""] ?? INIT_USAGE}`);
   }
   // Not process.exit(): approve-builder may still be closing its server, and

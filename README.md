@@ -52,7 +52,7 @@ this repo is.
 
 ## Status
 
-Early, but real. 379 tests, no network calls in any of them.
+Early, but real. 391 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
@@ -64,8 +64,11 @@ Early, but real. 379 tests, no network calls in any of them.
 | `src/trading-client.ts` | The interface live and paper both satisfy |
 | `src/decision-log.ts` | Append-only record of every attempt and its stated reason |
 | `src/decision-log-file.ts` | JSON Lines log on disk |
-| `src/bin/cli.ts` | The `reins` command: `serve` (default), `init`, `approve-builder`, `live-check` and `stats` |
+| `src/bin/cli.ts` | The `reins` command: `serve` (default), `init`, `approve-builder`, `live-check`, `http` and `stats` |
 | `src/bin/serve.ts` | stdio entry point |
+| `src/bin/http.ts` | `reins http` — the HTTP server: token, binding, JSON |
+| `src/http-api.ts` | The same nine tools as HTTP routes, for bots that do not speak MCP |
+| `src/runtime.ts` | The limits, client, log and banner both front doors share |
 | `src/init.ts` | `reins init` — writes a paper-mode server entry into `.mcp.json` |
 | `src/builder-fee.ts` | Reins' builder fee, and the approval live trading needs before it starts |
 | `src/approve-builder.ts` | `reins approve-builder` — the user approves the builder fee in their own wallet |
@@ -324,6 +327,48 @@ and paper results include the fee so they match what live would cost. Before
 live trading starts, the account approves the fee once from its own wallet
 (`npx @r2rlabs/reins approve-builder`); until it has, the server refuses to
 start in live mode and says how to approve. Testnet orders carry no fee.
+
+## Plug a bot in (HTTP)
+
+A bot that does not speak MCP — Python, Go, Rust, anything that can make an
+HTTP request — gets the same limits and the same decision log:
+
+```bash
+npx @r2rlabs/reins http --port 8787        # prints a token; paper by default
+```
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8787/limits
+curl -H "Authorization: Bearer $TOKEN" -H "content-type: application/json" \
+  -d '{"symbol":"ETH","side":"buy","sizeUsd":1000,"stopLoss":2620,"reason":"Breakout retest"}' \
+  http://127.0.0.1:8787/orders
+```
+
+| Route | What it does |
+|---|---|
+| `GET /health` | Paper or live, and the routes. The only one that needs no token |
+| `GET /limits` | The limits, headroom, and whether the daily loss has halted trading |
+| `GET /positions` | Exposure, account value, stops, anything unprotected |
+| `GET /book?symbol=ETH&depth=5` | Top of book |
+| `GET /candles?symbol=ETH&interval=1h&count=24` | Price history with the average range |
+| `GET /decisions?limit=10` | The log back out, newest first |
+| `POST /orders` | Place an order. `reason` is required, as it is for an agent |
+| `POST /stops` | Set or move a stop |
+| `POST /cancel` | Cancel a resting order by id |
+| `POST /close` | Close a position |
+
+Every route runs the same risk engine and writes the same records as the MCP
+tools, so a refused order comes back as `400` with the limit that stopped it:
+`BLOCKED (TRADE_RISK_TOO_LARGE): Stopping out would lose $50.99, over the $30
+allowed on one trade.`
+
+**It is a trading endpoint.** It binds `127.0.0.1` unless `--host` says
+otherwise, and every route but `/health` needs the bearer token. Exposing it
+beyond your own machine means choosing your own token and putting TLS in front
+of it.
+
+A working example in 40 lines of Python, sizing its order from the stop:
+[`examples/bot.py`](examples/bot.py).
 
 ### Checking it against the real exchange
 
