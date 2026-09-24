@@ -4,14 +4,16 @@
   "title": "Reins",
   "description": "Risk limits and an audit log for AI agents trading Hyperliquid, enforced outside the model.",
   "websiteUrl": "https://www.npmjs.com/package/@r2rlabs/reins",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@r2rlabs/reins",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "runtimeHint": "npx",
-      "transport": { "type": "stdio" },
+      "transport": {
+        "type": "stdio"
+      },
       "environmentVariables": [
         {
           "name": "REINS_SYMBOLS",
@@ -45,14 +47,20 @@
           "description": "paper (live prices, simulated fills, nothing signed) or live.",
           "format": "string",
           "default": "paper",
-          "choices": ["paper", "live"]
+          "choices": [
+            "paper",
+            "live"
+          ]
         },
         {
           "name": "REINS_NETWORK",
           "description": "Hyperliquid network for prices and, in live mode, orders. Mainnet spends real money.",
           "format": "string",
           "default": "testnet",
-          "choices": ["testnet", "mainnet"]
+          "choices": [
+            "testnet",
+            "mainnet"
+          ]
         },
         {
           "name": "REINS_REQUIRE_STOP_LOSS",
