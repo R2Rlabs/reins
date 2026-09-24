@@ -25,6 +25,14 @@ export interface RiskLimits {
    * an order the exchange executes whether or not the agent is awake.
    */
   requireStopLoss?: boolean;
+  /**
+   * Most a single trade may lose if its stop fills at the trigger, in USD.
+   * The position cap limits how much is at stake; this limits how much of it
+   * is actually risked, which is the number that decides a losing run: a
+   * $2,500 position with a stop 5% away risks ten times one with a stop 0.5%
+   * away. Checked against `riskUsd` on orders that add risk.
+   */
+  maxTradeRiskUsd?: number;
 }
 
 export interface AccountState {
@@ -47,11 +55,18 @@ export interface OrderRequest {
   reduceOnly?: boolean;
   /** Carries a stop-loss, placed as the order fills. */
   hasStopLoss?: boolean;
+  /**
+   * What this order loses if its stop fills at the trigger price: the
+   * distance from entry to stop, times the size. The caller works it out,
+   * because only it knows the entry price the order will use.
+   */
+  riskUsd?: number;
 }
 
 export type RiskCode =
   | "HALTED_DAILY_LOSS"
   | "NO_STOP_LOSS"
+  | "TRADE_RISK_TOO_LARGE"
   | "SYMBOL_NOT_ALLOWED"
   | "RATE_LIMITED"
   | "POSITION_TOO_LARGE"
@@ -189,6 +204,19 @@ export class RiskEngine {
             "position is never open without one.",
         };
       }
+    }
+
+    // How far the stop sits, not how big the order is, decides what a losing
+    // trade costs. Size and stop distance are only safe together.
+    const maxRisk = this.limits.maxTradeRiskUsd;
+    if (maxRisk !== undefined && addsRisk && order.riskUsd !== undefined && order.riskUsd > maxRisk) {
+      return {
+        allowed: false,
+        code: "TRADE_RISK_TOO_LARGE",
+        reason:
+          `Stopping out would lose ${usd(order.riskUsd)}, over the ${usd(maxRisk)} allowed on one trade. ` +
+          `Move the stop closer or send a smaller order.`,
+      };
     }
 
     if (Math.abs(projected) > this.limits.maxPositionUsd) {

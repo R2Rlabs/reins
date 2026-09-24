@@ -121,6 +121,7 @@ describe("serverEntry", () => {
       REINS_SYMBOLS: "BTC,ETH",
       REINS_MAX_POSITION_USD: "5000",
       REINS_DAILY_LOSS_USD: "500",
+      REINS_MAX_TRADE_RISK_USD: "100",
       REINS_MAX_LEVERAGE: "3",
       REINS_MAX_ORDERS_PER_MIN: "12",
       REINS_PAPER_BALANCE: "10000",
@@ -187,7 +188,7 @@ describe("runInit", () => {
 
     const written = JSON.parse(files[resolve(cwd, ".mcp.json")]!);
     expect(written.mcpServers.reins.env.REINS_MODE).toBe("paper");
-    expect(output()).toContain("✓ Limits — max position $5,000 · daily loss $500 · BTC, ETH");
+    expect(output()).toContain("✓ Limits — max position $5,000 · daily loss $500 · $100 risk per trade · BTC, ETH");
     expect(output()).toContain("decisions.jsonl");
     expect(output()).toContain("Created");
     expect(output()).toContain("9 tools on stdio");

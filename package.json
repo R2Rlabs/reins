@@ -34,10 +34,11 @@
     "typecheck": "tsc --noEmit && tsc -p examples/demo-agent",
     "build": "tsc -p tsconfig.build.json",
     "serve": "npm run build && node dist/bin/serve.js",
-    "check": "npm run typecheck && npm run test && npm run build",
+    "check": "npm run build && npm run typecheck && npm run test",
     "demo": "node examples/demo-agent/agent.ts",
     "demo:report": "node examples/demo-agent/report.ts",
-    "prepublishOnly": "npm run check"
+    "prepublishOnly": "npm run check",
+    "demo:settle": "node examples/demo-agent/settle.ts"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.126.0",

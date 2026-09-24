@@ -52,11 +52,11 @@ this repo is.
 
 ## Status
 
-Early, but real. 371 tests, no network calls in any of them.
+Early, but real. 379 tests, no network calls in any of them.
 
 | Module | What it does |
 |---|---|
-| `src/risk.ts` | The risk engine — position cap, leverage cap, daily loss halt, allowlist, rate limit |
+| `src/risk.ts` | The risk engine — position cap, risk per trade, leverage cap, daily loss halt, allowlist, rate limit |
 | `src/client.ts` | Hyperliquid REST client — orders, cancels, book, candles, fills, account state, builder code |
 | `src/mcp-server.ts` | The agent-facing tools, each risk-checked and logged before anything is sent |
 | `src/paper.ts` | Paper trading — live prices, simulated fills. See below |

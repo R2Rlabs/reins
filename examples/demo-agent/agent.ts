@@ -50,6 +50,8 @@ const SERVER: Omit<DemoServerConfig, "paperFile" | "logFile"> = {
   maxLeverage: 3,
   maxOrdersPerMin: 6,
   paperBalanceUsd: 10_000,
+  // Run 2's trades each risked about $20; this caps a careless one.
+  maxTradeRiskUsd: 30,
   // Every position gets a stop the exchange holds, so an exit the agent
   // describes is one that happens even between cycles.
   requireStopLoss: true,

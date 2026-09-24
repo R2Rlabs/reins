@@ -195,6 +195,46 @@ describe("refusal messages", () => {
   });
 });
 
+describe("maxTradeRiskUsd", () => {
+  const capped = new RiskEngine({ ...limits, maxTradeRiskUsd: 100 });
+  const order = (sizeUsd: number, riskUsd: number) => ({
+    symbol: "BTC" as const,
+    side: "buy" as const,
+    sizeUsd,
+    hasStopLoss: true,
+    riskUsd,
+  });
+
+  it("allows a wide stop on a small order, and a tight stop on a large one", () => {
+    // $2,000 with the stop 5% away, and $20,000 with it 0.5% away: both $100.
+    expect(capped.check(order(2_000, 100), flat)).toEqual({ allowed: true });
+    expect(capped.check(order(20_000, 100), flat)).toEqual({ allowed: true });
+  });
+
+  it("refuses a position whose stop would cost more than the limit", () => {
+    const decision = capped.check(order(10_000, 500), flat);
+    expect(decision).toMatchObject({ allowed: false, code: "TRADE_RISK_TOO_LARGE" });
+    expect(decision).toMatchObject({ reason: expect.stringContaining("lose $500, over the $100 allowed") });
+    expect(decision).toMatchObject({ reason: expect.stringContaining("Move the stop closer or send a smaller order") });
+  });
+
+  it("is not in the way of closing a position", () => {
+    const long = { ...flat, positionsUsd: { BTC: 10_000 } };
+    expect(
+      capped.check({ symbol: "BTC", side: "sell", sizeUsd: 10_000, reduceOnly: true, riskUsd: 900 }, long),
+    ).toEqual({ allowed: true });
+  });
+
+  it("does nothing unless the limit is set", () => {
+    expect(new RiskEngine(limits).check(order(10_000, 5_000), flat)).toEqual({ allowed: true });
+  });
+
+  it("lets an order through when the risk is not known", () => {
+    // No stop, no figure to check: the stop-loss rule is what covers that case.
+    expect(capped.check({ symbol: "BTC", side: "buy", sizeUsd: 10_000 }, flat)).toEqual({ allowed: true });
+  });
+});
+
 describe("requireStopLoss", () => {
   const guarded = new RiskEngine({ ...limits, requireStopLoss: true });
   const long = { ...flat, positionsUsd: { BTC: 5_000 } };

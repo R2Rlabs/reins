@@ -468,6 +468,11 @@ export function placeOrder(
       sizeUsd: args.sizeUsd,
       hasStopLoss: args.stopLoss !== undefined,
     };
+    if (args.stopLoss !== undefined) {
+      // What the stop costs if it fills at its trigger: the gap between entry
+      // and stop, as a fraction of the notional.
+      request.riskUsd = round((Math.abs(limitPrice - args.stopLoss) / limitPrice) * args.sizeUsd, 6);
+    }
     if (args.reduceOnly !== undefined) request.reduceOnly = args.reduceOnly;
 
     // Logged as sent: without it, a post-only order the market refused reads
@@ -481,7 +486,7 @@ export function placeOrder(
       marketable,
       reduceOnly: args.reduceOnly ?? false,
       tif,
-      ...(args.stopLoss !== undefined ? { stopLoss: args.stopLoss } : {}),
+      ...(args.stopLoss !== undefined ? { stopLoss: args.stopLoss, riskUsd: round(request.riskUsd ?? 0) } : {}),
     });
     record.context = contextOf(state);
 
@@ -922,7 +927,9 @@ export function createMcpServer(deps: McpServerDeps): McpServer {
             "Trigger price of a stop-loss for this order: below the entry for a buy, above " +
               "it for a sell. An order that fills now gets a stop under the whole position; " +
               "a resting order takes its stop with it, placed as it fills, so the position " +
-              "is never unprotected.",
+              "is never unprotected. How far the stop sits decides what the trade risks " +
+              "(distance to stop x size), which get_limits reports as maxTradeRiskUsd: a " +
+              "wider stop needs a smaller order.",
           ),
       }),
     },

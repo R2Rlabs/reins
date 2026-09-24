@@ -210,6 +210,8 @@ export interface DemoServerConfig {
   maxLeverage: number;
   maxOrdersPerMin: number;
   paperBalanceUsd: number;
+  /** Most one trade may lose if its stop fills. */
+  maxTradeRiskUsd: number;
   requireStopLoss: boolean;
   paperFile: string;
   logFile: string;
@@ -237,6 +239,7 @@ export function buildServerEnv(
     REINS_SYMBOLS: config.symbols.join(","),
     REINS_MAX_POSITION_USD: String(config.maxPositionUsd),
     REINS_DAILY_LOSS_USD: String(config.dailyLossUsd),
+    REINS_MAX_TRADE_RISK_USD: String(config.maxTradeRiskUsd),
     REINS_MAX_LEVERAGE: String(config.maxLeverage),
     REINS_MAX_ORDERS_PER_MIN: String(config.maxOrdersPerMin),
     REINS_PAPER_BALANCE: String(config.paperBalanceUsd),

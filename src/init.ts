@@ -23,6 +23,7 @@ Options:
   --symbols <list>         Allowlist, comma separated          (default BTC,ETH)
   --max-position <usd>     Max position per symbol, USD        (default 5000)
   --daily-loss <usd>       Daily realised loss before halting  (default 500)
+  --max-trade-risk <usd>   Most one trade may lose if stopped     (default 100)
   --max-leverage <x>       Max leverage                        (default 3)
   --max-orders <n>         Max orders per minute               (default 12)
   --balance <usd>          Opening paper balance               (default 10000)
@@ -39,6 +40,7 @@ export interface InitOptions {
   symbols: string[];
   maxPositionUsd: number;
   dailyLossUsd: number;
+  maxTradeRiskUsd: number;
   maxLeverage: number;
   maxOrdersPerMinute: number;
   balanceUsd: number;
@@ -68,6 +70,7 @@ export function parseInitArgs(argv: string[]): InitOptions {
       symbols: { type: "string", default: "BTC,ETH" },
       "max-position": { type: "string", default: "5000" },
       "daily-loss": { type: "string", default: "500" },
+      "max-trade-risk": { type: "string", default: "100" },
       "max-leverage": { type: "string", default: "3" },
       "max-orders": { type: "string", default: "12" },
       balance: { type: "string", default: "10000" },
@@ -107,6 +110,7 @@ export function parseInitArgs(argv: string[]): InitOptions {
     symbols,
     maxPositionUsd: positive("max-position", values["max-position"]),
     dailyLossUsd: positive("daily-loss", values["daily-loss"]),
+    maxTradeRiskUsd: positive("max-trade-risk", values["max-trade-risk"]),
     maxLeverage: positive("max-leverage", values["max-leverage"]),
     maxOrdersPerMinute,
     balanceUsd: positive("balance", values.balance),
@@ -168,6 +172,7 @@ export function serverEntry(opts: InitOptions, launch: Launch, cwd: string): Ser
       REINS_SYMBOLS: opts.symbols.join(","),
       REINS_MAX_POSITION_USD: String(opts.maxPositionUsd),
       REINS_DAILY_LOSS_USD: String(opts.dailyLossUsd),
+      REINS_MAX_TRADE_RISK_USD: String(opts.maxTradeRiskUsd),
       REINS_MAX_LEVERAGE: String(opts.maxLeverage),
       REINS_MAX_ORDERS_PER_MIN: String(opts.maxOrdersPerMinute),
       REINS_PAPER_BALANCE: String(opts.balanceUsd),
@@ -252,6 +257,7 @@ export async function runInit(argv: string[], deps: InitDeps): Promise<void> {
   deps.out(
     `✓ Paper mode — live ${opts.network} prices, simulated fills, no capital at risk\n` +
       `✓ Limits — max position ${usd(opts.maxPositionUsd)} · daily loss ${usd(opts.dailyLossUsd)} · ` +
+      `${usd(opts.maxTradeRiskUsd)} risk per trade · ` +
       `${opts.symbols.join(", ")}\n` +
       `✓ Paper account — ${usd(opts.balanceUsd)} · ${display(entry.env["REINS_PAPER_FILE"]!, deps.cwd)}\n` +
       `✓ Decision log — ${display(entry.env["REINS_LOG_FILE"]!, deps.cwd)}\n` +

@@ -49,6 +49,10 @@ function readLimits(): RiskLimits {
     symbolAllowlist: symbols,
     maxOrdersPerMinute: num("REINS_MAX_ORDERS_PER_MIN", 12),
     requireStopLoss: flag("REINS_REQUIRE_STOP_LOSS"),
+    // Optional: without it, only the position cap limits a trade.
+    ...(process.env["REINS_MAX_TRADE_RISK_USD"]
+      ? { maxTradeRiskUsd: num("REINS_MAX_TRADE_RISK_USD") }
+      : {}),
   };
 }
 
@@ -152,6 +156,11 @@ async function main(): Promise<void> {
       `  daily loss      $${limits.dailyLossLimitUsd.toLocaleString()}\n` +
       `  max leverage    ${limits.maxLeverage}x\n` +
       `  stop-losses     ${limits.requireStopLoss ? "required on every position" : "optional"}\n` +
+      `  risk per trade  ${
+        limits.maxTradeRiskUsd === undefined
+          ? "not limited (set REINS_MAX_TRADE_RISK_USD)"
+          : `$${limits.maxTradeRiskUsd.toLocaleString()} if the stop fills`
+      }\n` +
       `  symbols         ${limits.symbolAllowlist.join(", ")}\n` +
       `  builder fee     ${
         mode === "paper"

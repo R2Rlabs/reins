@@ -280,6 +280,47 @@ describe("close_position", () => {
   });
 });
 
+describe("maxTradeRiskUsd", () => {
+  function riskCapped(maxTradeRiskUsd: number): McpServerDeps {
+    return {
+      client: paper,
+      engine: new RiskEngine({
+        maxPositionUsd: 2_500,
+        maxLeverage: 3,
+        dailyLossLimitUsd: 300,
+        symbolAllowlist: ["ETH"],
+        maxOrdersPerMinute: 12,
+        maxTradeRiskUsd,
+      }),
+      log,
+      now: () => clock.ms,
+    };
+  }
+
+  it("works the risk out from the entry price and the stop, and logs it", async () => {
+    // $2,000 entered at the marketable 2646.14 (the 2643.5 ask plus the
+    // crossing buffer) with the stop at 2630.8: 0.58% away, about $11.60.
+    const d = riskCapped(20);
+    const body = parse(await placeOrder(d, { ...buy, stopLoss: 2630.8 }));
+    expect(body).toMatchObject({ kind: "filled" });
+    expect(log.records[0]!.request["riskUsd"]).toBeCloseTo(11.6, 1);
+  });
+
+  it("refuses the same size with a stop too far away, and sends nothing", async () => {
+    const d = riskCapped(20);
+    const blocked = await placeOrder(d, { ...buy, stopLoss: 2560 });
+    expect(text(blocked)).toMatch(/BLOCKED \(TRADE_RISK_TOO_LARGE\).*over the \$20 allowed/s);
+    expect((await paper.snapshot()).fills).toHaveLength(0);
+    expect(log.records[0]!.risk).toMatchObject({ allowed: false, code: "TRADE_RISK_TOO_LARGE" });
+  });
+
+  it("takes the same trade at a size the stop distance allows", async () => {
+    const d = riskCapped(20);
+    parse(await placeOrder(d, { ...buy, sizeUsd: 600, stopLoss: 2560 }));
+    expect((await paper.snapshot()).fills).toHaveLength(1);
+  });
+});
+
 describe("fills the exchange made without an agent call", () => {
   const kinds = () =>
     log.records.map((r) => (r.tool === "exchange_fill" ? `${r.tool}:${String(r.request["kind"])}` : r.tool));
