@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reins — risk limits and an audit log for AI agents trading Hyperliquid</title>
+<meta name="description" content="Let an AI agent or bot trade Hyperliquid under limits it cannot change, with every decision on the record. Paper trading is free.">
+<link rel="canonical" href="https://r2rlabs.com/">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="R2R Labs">
+<meta property="og:url" content="https://r2rlabs.com/">
+<meta property="og:title" content="Reins — risk limits and an audit log for AI agents trading Hyperliquid">
+<meta property="og:description" content="Limits an agent cannot argue with, a stop on every position, and a record of every decision it made. Paper trading is free.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Reins — guardrails for AI agents trading Hyperliquid">
+<meta name="twitter:description" content="Limits an agent cannot argue with, a stop on every position, and a record of every decision it made.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234ADE80' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z'/><path d='M9 12l2 2 4-4'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Reins",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Windows, macOS, Linux",
+  "description": "Risk limits and an audit log for AI agents trading Hyperliquid, enforced outside the model.",
+  "url": "https://r2rlabs.com/",
+  "downloadUrl": "https://www.npmjs.com/package/@r2rlabs/reins",
+  "license": "https://opensource.org/licenses/MIT",
+  "author": { "@type": "Organization", "name": "R2R Labs", "url": "https://r2rlabs.com/" }
+}
+</script>
+<style>
+  :root {
+    --bg: #0c0f16;
+    --panel: #141a24;
+    --line: #242d3b;
+    --line-soft: #1c242f;
+    --text: #e8edf4;
+    --muted: #97a2b4;
+    --dim: #7c8798;
+    --accent: #4ade80;
+    --accent-ink: #06210f;
+    --amber: #f0b429;
+    --blue: #7da9f0;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Space Grotesk", system-ui, -apple-system, Segoe UI, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); }
+  a:hover { color: #86efac; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+  header {
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    background: rgba(12, 15, 22, 0.92);
+    backdrop-filter: blur(8px);
+    z-index: 2;
+  }
+  .bar { display: flex; align-items: center; gap: 20px; padding: 16px 0; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: -0.02em; font-size: 18px; color: var(--text); text-decoration: none; }
+  nav { margin-left: auto; display: flex; gap: 20px; font-size: 15px; flex-wrap: wrap; }
+  nav a { color: var(--muted); text-decoration: none; }
+  nav a:hover { color: var(--text); }
+  h1 { font-size: clamp(32px, 6vw, 56px); line-height: 1.08; letter-spacing: -0.03em; margin: 0 0 20px; max-width: 16ch; }
+  h2 { font-size: clamp(22px, 3.4vw, 30px); letter-spacing: -0.02em; margin: 0 0 16px; }
+  h3 { font-size: 17px; font-weight: 500; margin: 0 0 8px; }
+  p { margin: 0 0 16px; }
+  .lede { font-size: clamp(17px, 2.2vw, 20px); color: var(--muted); max-width: 62ch; }
+  section { padding: 64px 0; border-top: 1px solid var(--line-soft); }
+  section:first-of-type { border-top: 0; padding-top: 56px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #2a3646; border-radius: 999px; padding: 6px 14px; font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+  .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; font-size: 16px; font-weight: 500; text-decoration: none; }
+  .btn-primary { background: var(--accent); color: var(--accent-ink); }
+  .btn-primary:hover { background: #86efac; color: var(--accent-ink); }
+  .btn-ghost { border: 1px solid #2e3b4c; color: var(--text); }
+  .btn-ghost:hover { border-color: var(--muted); color: var(--text); }
+  code, pre { font-family: var(--mono); }
+  .cmd { display: block; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-size: 14px; color: #c3ccda; overflow-x: auto; margin: 24px 0; }
+  .cmd .prompt { color: var(--dim); user-select: none; }
+  pre { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; overflow-x: auto; font-size: 13.5px; color: #c3ccda; line-height: 1.75; margin: 0 0 16px; }
+  .terminal { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin: 28px 0 0; }
+  .terminal .top { display: flex; align-items: center; gap: 7px; padding: 11px 16px; border-bottom: 1px solid var(--line); }
+  .terminal .top span.led { width: 10px; height: 10px; border-radius: 50%; background: #2e3b4c; display: inline-block; }
+  .terminal .top .label { margin-left: 8px; font-family: var(--mono); font-size: 12px; color: var(--dim); }
+  .terminal .body { padding: 18px 20px; font-family: var(--mono); font-size: 13.5px; line-height: 1.95; color: #c3ccda; overflow-x: auto; }
+  .ok { color: var(--accent); }
+  .warn { color: var(--amber); }
+  .note { color: var(--dim); }
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
+  .card p { color: var(--muted); font-size: 15px; margin: 0; }
+  .card svg { margin-bottom: 14px; }
+  ul.clean { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+  ul.clean li { color: var(--muted); font-size: 15px; padding-left: 26px; position: relative; }
+  ul.clean li b { color: var(--text); font-weight: 500; }
+  ul.clean li::before { position: absolute; left: 0; top: 0; font-family: var(--mono); }
+  ul.is li::before { content: "✓"; color: var(--accent); }
+  ul.isnt li::before { content: "✕"; color: var(--amber); }
+  ol.principles { counter-reset: p; list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  ol.principles li { counter-increment: p; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; color: #c3ccda; font-size: 15px; }
+  ol.principles li::before { content: counter(p); font-family: var(--mono); color: var(--accent); margin-right: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  th { color: var(--dim); font-weight: 500; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+  td.num { font-family: var(--mono); color: var(--text); white-space: nowrap; }
+  td { color: var(--muted); }
+  footer { border-top: 1px solid var(--line); padding: 32px 0 48px; color: var(--dim); font-size: 14px; }
+  footer a { color: var(--muted); }
+  .footer-row { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  .footer-row .spacer { margin-left: auto; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <a class="brand" href="/">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+      Reins
+    </a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#bots">For bots</a>
+      <a href="#log">The log</a>
+      <a href="https://www.npmjs.com/package/@r2rlabs/reins">npm</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section>
+    <span class="pill"><span class="dot"></span> Non-custodial · your funds stay in your own Hyperliquid account</span>
+    <h1>Let an AI agent trade without giving it the power to lose everything.</h1>
+    <p class="lede">Reins sits between your agent and Hyperliquid. Position size, leverage, daily loss, which markets it may touch and a stop on every position are enforced <strong>outside the model</strong>, and every decision is written down with the reason the agent gave for it.</p>
+    <code class="cmd"><span class="prompt">$</span> npx @r2rlabs/reins init</code>
+    <div class="actions">
+      <a class="btn btn-primary" href="https://www.npmjs.com/package/@r2rlabs/reins">Install it</a>
+      <a class="btn btn-ghost" href="https://gist.github.com/R2Rlabs/246a5009684787a586ddee1d2615eb14">Read what an agent did</a>
+    </div>
+
+    <div class="terminal">
+      <div class="top"><span class="led"></span><span class="led"></span><span class="led"></span><span class="label">terminal</span></div>
+      <div class="body">
+        <div><span class="note">$</span> npx @r2rlabs/reins init</div>
+        <div class="ok">✓ Paper mode — live prices, simulated fills, no capital at risk</div>
+        <div class="ok">✓ Limits — max position $5,000 · daily loss $500 · $100 risk per trade · BTC, ETH</div>
+        <div class="ok">✓ Decision log — ./decisions.jsonl</div>
+        <div class="ok">✓ Builder fee — 2 bp to Reins on live orders; paper results include it</div>
+        <div><span class="warn">→</span> 9 tools on stdio. Point your agent at it.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="how">
+    <h2>What it does</h2>
+    <div class="grid">
+      <article class="card">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+        <h3>Limits it can't argue with</h3>
+        <p>Position size, leverage, daily loss, a market allowlist, and a cap on what one trade may lose if its stop fills. There is no tool that changes them, so no prompt or clever reasoning gets past them.</p>
+      </article>
+      <article class="card">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F0B429" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6"></path><path d="M10 3v6l-5 9a2 2 0 001.7 3h10.6a2 2 0 001.7-3l-5-9V3"></path></svg>
+        <h3>Rehearse on real prices</h3>
+        <p>Paper trading on live Hyperliquid prices with realistic fills and fees, using the same tools and the same limits as live. Nothing is signed, and no key is needed.</p>
+      </article>
+      <article class="card">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7DA9F0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16H5z"></path><path d="M9 9h6"></path><path d="M9 13h6"></path><path d="M9 17h3"></path></svg>
+        <h3>Every decision on the record</h3>
+        <p>Each order, refusal, wait and stop-out is stored with the reason given for it. When something strange happens at 3am, you can read exactly what it thought it was doing.</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="bots">
+    <h2>Any bot can plug in</h2>
+    <p class="lede">Agents speak to Reins over MCP. Everything else speaks HTTP: swap “send this order to the exchange” for “send it to Reins”, and inherit the limits and the log without changing anything else.</p>
+    <pre><span class="note">$</span> npx @r2rlabs/reins http --port 8787
+
+<span class="note">$</span> curl -H "Authorization: Bearer $TOKEN" \
+    -d '{"symbol":"ETH","side":"buy","sizeUsd":1000,"stopLoss":2620,"reason":"Breakout retest"}' \
+    http://127.0.0.1:8787/orders
+
+<span class="warn">400</span> BLOCKED (TRADE_RISK_TOO_LARGE): Stopping out would lose $50.99,
+    over the $30 allowed on one trade. Move the stop closer or send a smaller order.</pre>
+    <p>Routes for limits, positions, book, candles, orders, stops, cancels, closes and the log itself. It binds to your own machine and needs a token; a refused order comes back with the limit that stopped it.</p>
+  </section>
+
+  <section id="log">
+    <h2>What the record is for</h2>
+    <p class="lede">An agent's explanation of its own trading is testimony, not fact. Reins stores the reason and the outcome side by side, so the two can be compared.</p>
+    <p>In a five-day paper run, the log caught the agent misreporting its own trade twice. Once it wrote that it was exiting at 81,021 “rather than wait for the 81,060 stop”. It filled at 81,063, worse than the stop it meant to beat.</p>
+    <table>
+      <caption class="note" style="text-align:left;padding:0 12px 12px;font-size:14px">From that run: 111 hourly cycles, 10 trades, ending at −0.21%.</caption>
+      <tbody>
+        <tr><td class="num">$17.08</td><td>Worst single trade, 0.17% of the account</td></tr>
+        <tr><td class="num">0</td><td>Positions left without a stop, and 0 orders that breached a limit</td></tr>
+        <tr><td class="num">7 of 10</td><td>Trades closed by a stop the exchange held, several while the agent slept</td></tr>
+        <tr><td class="num">141</td><td>Records written, including the 72 times it decided not to trade</td></tr>
+      </tbody>
+    </table>
+    <div class="actions" style="margin-top:20px">
+      <a class="btn btn-ghost" href="https://gist.github.com/R2Rlabs/246a5009684787a586ddee1d2615eb14">Read the full write-up</a>
+    </div>
+  </section>
+
+  <section>
+    <h2>What Reins is, and is not</h2>
+    <div class="grid">
+      <article class="card">
+        <h3 style="color:var(--accent)">What it is</h3>
+        <ul class="clean is">
+          <li><b>Limits outside the model.</b> Checked before anything reaches the exchange.</li>
+          <li><b>A record you can check.</b> Refusals and waits included.</li>
+          <li><b>Somewhere to rehearse.</b> Paper trading on live prices, free.</li>
+          <li><b>Non-custodial.</b> It trades through an API wallet that cannot withdraw.</li>
+          <li><b>Paid for openly.</b> A 2 bp builder fee on live orders, shown up front.</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h3 style="color:var(--amber)">What it is not</h3>
+        <ul class="clean isnt">
+          <li><b>Not a trading bot or a strategy.</b> It doesn't decide what to trade.</li>
+          <li><b>Not an exchange, broker or custodian.</b> Hyperliquid matches the orders.</li>
+          <li><b>Not a promise against losses.</b> Limits cap what can go wrong, not the market.</li>
+          <li><b>Not financial advice.</b></li>
+          <li><b>Not something you take on trust.</b> Every action is on the record.</li>
+        </ul>
+      </article>
+    </div>
+    <ol class="principles">
+      <li>Limits live outside the model.</li>
+      <li>The record outranks the reasoning.</li>
+      <li>Paper before real money.</li>
+      <li>Your keys, your funds.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Start on paper</h2>
+    <p class="lede">Paper trading costs nothing and needs no key. Point Claude, Cursor, or your own bot at it and watch what it does.</p>
+    <code class="cmd"><span class="prompt">$</span> npx @r2rlabs/reins init</code>
+    <div class="actions">
+      <a class="btn btn-primary" href="https://www.npmjs.com/package/@r2rlabs/reins">Get it from npm</a>
+      <a class="btn btn-ghost" href="https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.R2Rlabs/reins">MCP Registry listing</a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap footer-row">
+    <span>R2R Labs</span>
+    <span>·</span>
+    <span>Reins is MIT licensed</span>
+    <span class="spacer"></span>
+    <a href="https://www.npmjs.com/package/@r2rlabs/reins">npm</a>
+    <a href="https://gist.github.com/R2Rlabs/246a5009684787a586ddee1d2615eb14">Write-up</a>
+  </div>
+  <div class="wrap" style="margin-top:14px;max-width:70ch">
+    Trading perpetual futures carries risk, including the loss of your capital. Reins bounds what a position or a day may cost you; it does not prevent losses and is not financial advice.
+  </div>
+</footer>
+
+</body>
+</html>

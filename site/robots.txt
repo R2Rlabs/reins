@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://r2rlabs.com/sitemap.xml

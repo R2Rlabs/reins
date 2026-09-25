@@ -16,3 +16,6 @@ demo-data/
 mcp-publisher.exe
 mcp-publisher.tar.gz
 mcp-publisher
+
+# The site zipped up for uploading to the host.
+r2rlabs-site.zip
