@@ -19,3 +19,6 @@ mcp-publisher
 
 # The site zipped up for uploading to the host.
 r2rlabs-site.zip
+
+# Working notes for Claude: local only, they are not part of the product.
+CLAUDE.md
