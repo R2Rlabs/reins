@@ -8,6 +8,9 @@ npx @r2rlabs/reins init      # adds a paper-trading Reins server to .mcp.json
 
 See it at work: [an AI agent trading Hyperliquid on paper, run 2](https://gist.github.com/R2Rlabs/246a5009684787a586ddee1d2615eb14).
 
+The source is on GitHub: [R2Rlabs/reins](https://github.com/R2Rlabs/reins). Every limit in this README is a
+function you can read.
+
 ### What Reins is
 
 - **Limits the agent can't argue with.** Every order passes checks that live

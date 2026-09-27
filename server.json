@@ -3,13 +3,17 @@
   "name": "io.github.R2Rlabs/reins",
   "title": "Reins",
   "description": "Risk limits and an audit log for AI agents trading Hyperliquid, enforced outside the model.",
-  "websiteUrl": "https://www.npmjs.com/package/@r2rlabs/reins",
-  "version": "0.1.5",
+  "websiteUrl": "https://r2rlabs.com",
+  "repository": {
+    "url": "https://github.com/R2Rlabs/reins",
+    "source": "github"
+  },
+  "version": "0.1.6",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@r2rlabs/reins",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

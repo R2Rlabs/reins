@@ -1,8 +1,16 @@
 {
   "name": "@r2rlabs/reins",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Execution layer for trading agents on Hyperliquid — risk limits enforced outside the model.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/R2Rlabs/reins.git"
+  },
+  "homepage": "https://r2rlabs.com",
+  "bugs": {
+    "url": "https://github.com/R2Rlabs/reins/issues"
+  },
   "keywords": [
     "hyperliquid",
     "mcp",
