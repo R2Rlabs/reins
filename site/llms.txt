@@ -1,0 +1,22 @@
+# Reins
+
+> An execution layer for AI agents and bots trading Hyperliquid perpetuals. Position, leverage, daily-loss and per-trade risk limits are enforced outside the model, a stop-loss is required on every position, and every decision is written to an append-only log with the reason the agent gave. Paper trading (live prices, simulated fills, nothing signed) is the default. Reins is not an exchange and holds no funds or liquidity.
+
+Install: `npx @r2rlabs/reins init` adds a paper-trading Reins server to `.mcp.json`. Nine MCP tools over stdio; `reins http` serves the same tools over HTTP for bots that do not speak MCP.
+
+Cost: paper trading is free. Live trading on mainnet carries a 2 basis point Hyperliquid builder fee (capped by the exchange at 0.1% on perps), approved once by the account owner with `npx @r2rlabs/reins approve-builder`. There is no subscription, no account with Reins, and no custody of funds.
+
+## What an agent gets
+
+- Limits that refuse orders regardless of what the model decides: `POSITION_TOO_LARGE`, `LEVERAGE_TOO_HIGH`, `HALTED_DAILY_LOSS`, `TRADE_RISK_TOO_LARGE`, `NO_STOP_LOSS`, `SYMBOL_NOT_ALLOWED`, `RATE_LIMITED`, `INVALID_ORDER`.
+- Tools: get_positions, get_limits, get_book, get_candles, place_order, set_stop_loss, cancel_order, close_position, get_decisions.
+- HTTP endpoints for non-MCP bots: /health, /limits, /positions, /book, /candles, /decisions, /orders, /stops, /cancel, /close.
+- An append-only decision log, one JSON line per action, including refusals and fills the exchange made on its own.
+
+## Links
+
+- [Source](https://github.com/R2Rlabs/reins): TypeScript, MIT licensed, runs locally.
+- [npm package](https://www.npmjs.com/package/@r2rlabs/reins): `@r2rlabs/reins`.
+- [MCP Registry entry](https://registry.modelcontextprotocol.io/v0/servers?search=hyperliquid-reins): `io.github.R2Rlabs/hyperliquid-reins`.
+- [A recorded run](https://gist.github.com/R2Rlabs/246a5009684787a586ddee1d2615eb14): an AI agent trading on paper for five days, 111 cycles, every trade and refusal listed.
+- [Python client example](https://github.com/R2Rlabs/reins/blob/main/examples/bot.py): a dependency-free bot sizing its order from its stop.

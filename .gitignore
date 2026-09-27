@@ -22,3 +22,6 @@ r2rlabs-site.zip
 
 # Working notes for Claude: local only, they are not part of the product.
 CLAUDE.md
+
+# Local-only tooling: the daily interest report and its history.
+local/

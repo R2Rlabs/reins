@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.R2Rlabs/reins",
+  "name": "io.github.R2Rlabs/hyperliquid-reins",
   "title": "Reins",
   "description": "Risk limits and an audit log for AI agents trading Hyperliquid, enforced outside the model.",
   "websiteUrl": "https://r2rlabs.com",

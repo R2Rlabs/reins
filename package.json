@@ -64,5 +64,5 @@
   "publishConfig": {
     "access": "public"
   },
-  "mcpName": "io.github.R2Rlabs/reins"
+  "mcpName": "io.github.R2Rlabs/hyperliquid-reins"
 }
