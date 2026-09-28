@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reins Cloud — hosted risk limits, human approval and a kill switch for trading agents</title>
+<meta name="description" content="The Reins risk engine as a service: API wallet keys in a KMS, orders over a size you choose held for your approval, a kill switch only you can reset, alerts by email, Telegram and SMS, and one URL your agent connects to.">
+<link rel="canonical" href="https://r2rlabs.com/cloud/">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="R2R Labs">
+<meta property="og:url" content="https://r2rlabs.com/cloud/">
+<meta property="og:title" content="Reins Cloud — a human in the loop for AI trading agents">
+<meta property="og:description" content="Risk limits an agent cannot change, orders over your threshold held for approval, and a kill switch only you can reset. Hosted, with keys in a KMS.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Reins Cloud — hosted guardrails for trading agents">
+<meta name="twitter:description" content="Limits, human approval, a kill switch and an audit log, as a service.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234ADE80' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z'/><path d='M9 12l2 2 4-4'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Reins Cloud",
+  "applicationCategory": "FinanceApplication",
+  "operatingSystem": "Web",
+  "description": "Hosted risk limits, human approval and a kill switch for AI agents trading Hyperliquid perpetuals.",
+  "url": "https://r2rlabs.com/cloud/",
+  "author": { "@type": "Organization", "name": "R2R Labs", "url": "https://r2rlabs.com/" },
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD",
+    "description": "Paper and testnet are free. Live trading pays 2 basis points of the volume it protects, as a Hyperliquid builder fee."
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What stops an AI trading agent from blowing up an account?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Limits enforced outside the model, in a process it cannot reach: a cap per position, a required stop-loss, a daily loss limit that halts trading, an asset allowlist and a rate limit. Reins Cloud adds two more: orders over a size you choose wait for your approval, and a kill switch that any key can pull but only an owner login can reset."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Who holds the private key?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The agent never does. Reins Cloud creates a Hyperliquid API wallet whose key is generated inside AWS KMS and never leaves it: the service can ask KMS to sign a specific order, but cannot export the key. An API wallet can place and cancel orders but cannot withdraw, and you can revoke it on Hyperliquid at any time."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How does an agent connect?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "One URL and an API key. Reins Cloud speaks the Model Context Protocol, so any MCP runtime connects directly, and the same capabilities are available over a plain REST API for anything that is not MCP."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does it cost?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Paper and testnet are free. Live trading pays 2 basis points of the volume it protects, charged as a Hyperliquid builder fee on each fill, so there is no subscription and nothing to pay when an agent is not trading."
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <a class="brand" href="/">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+      Reins
+    </a>
+    <nav>
+      <a href="/">Overview</a>
+      <a href="/mcp/">MCP server</a>
+      <a href="/cloud/">Hosted</a>
+      <a href="https://www.npmjs.com/package/@r2rlabs/reins">npm</a>
+      <a href="https://github.com/R2Rlabs/reins">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+  <div class="pill"><span class="dot"></span> In testing on Hyperliquid testnet</div>
+  <h1>A human in the loop, for agents that trade while you sleep</h1>
+  <p class="lede">
+    Reins Cloud runs the same risk engine as <a href="/">Reins</a>, hosted. Your
+    agent connects to one URL with an API key. Limits it cannot change hold every
+    order, anything over a size you choose waits for you to approve it, and a kill
+    switch stops it dead — a switch any key can pull and only your login can reset.
+  </p>
+  <div class="actions">
+    <a class="btn btn-primary" href="https://github.com/R2Rlabs/reins/issues/new?title=Reins+Cloud+early+access">Ask for early access</a>
+    <a class="btn btn-ghost" href="/mcp/">Run it yourself instead</a>
+  </div>
+</section>
+
+<section id="what">
+  <h2>What it enforces</h2>
+  <div class="grid">
+    <article class="card">
+      <h3>Limits outside the model</h3>
+      <p>Position cap per asset, leverage, a daily loss limit that halts trading, an asset allowlist, a rate limit, and a stop-loss required on anything that opens a position. No tool changes them, so no prompt gets past them.</p>
+    </article>
+    <article class="card">
+      <h3>Your approval on the big ones</h3>
+      <p>Set a size above which an order waits for a person. The agent is told it is held, not refused, and can poll or withdraw. Requests lapse after ten minutes, and again if the price moves more than 1% while waiting, so nobody ever approves one trade and gets another.</p>
+    </article>
+    <article class="card">
+      <h3>A kill switch that stays pulled</h3>
+      <p>Any key can stop the agent, including the agent itself. Turning it back on needs your login and a fresh second factor. Cancels and closes keep working while it is on, so stopping never traps a position.</p>
+    </article>
+    <article class="card">
+      <h3>Keys you can prove nobody holds</h3>
+      <p>Each agent gets a Hyperliquid API wallet whose key is created inside a KMS and never exported. The service asks the KMS to sign a specific order; it cannot read the key. API wallets cannot withdraw, and you can revoke one on Hyperliquid without asking us.</p>
+    </article>
+    <article class="card">
+      <h3>Told before you notice</h3>
+      <p>Alerts by email, Telegram and SMS for the things that matter: an order held for approval, a limit hit, a stop fired, an agent gone quiet, a fill you did not place, the exchange unreachable.</p>
+    </article>
+    <article class="card">
+      <h3>Every attempt on the record</h3>
+      <p>An append-only decision log: what the agent tried, the reason it gave in its own words, what the risk engine said, what the exchange did. Refusals and orders held for you are kept as carefully as fills.</p>
+    </article>
+  </div>
+</section>
+
+<section id="connect">
+  <h2>One URL and a key</h2>
+  <p>
+    Point any MCP runtime — Claude Desktop, Claude Code, Cursor, or your own loop —
+    at the endpoint. There is nothing to install, and the same capabilities are on a
+    plain REST API for anything that does not speak MCP.
+  </p>
+<pre>{
+  "mcpServers": {
+    "reins-cloud": {
+      "url": "https://cloud.r2rlabs.com/mcp",
+      "headers": { "Authorization": "Bearer rc_live_agent_…" }
+    }
+  }
+}</pre>
+  <p>
+    The agent gets market data, orders, positions, stops and its own decision log.
+    It also gets the tools a hosted service needs that a local one does not: check
+    whether an order would be allowed before placing it, follow an order held for
+    your approval, and pull its own kill switch when something looks wrong.
+  </p>
+</section>
+
+<section id="price">
+  <h2>What it costs</h2>
+  <div class="rows">
+    <div class="row"><div>Paper</div><p>Free. Simulated fills on live prices, the same limits, no key and no money.</p></div>
+    <div class="row"><div>Testnet</div><p>Free. Real Hyperliquid testnet orders with test funds.</p></div>
+    <div class="row"><div>Live</div><p>2 basis points of the volume it protects, charged as a Hyperliquid builder fee on each fill. No subscription, and nothing to pay while an agent is idle.</p></div>
+  </div>
+  <p class="note">
+    $10,000 of volume costs $2. We are paid when your agent trades, not for
+    watching it sit still.
+  </p>
+</section>
+
+<section id="state">
+  <h2>Where it is</h2>
+  <p>
+    Honestly: in testing. The engine, the dashboard, human approval, the alerts,
+    the audit log and the MCP endpoint are built, and the whole path has traded on
+    Hyperliquid testnet — a real order signed by a KMS-held wallet, a stop resting
+    on the exchange, closed and reconciled against the exchange's own record.
+  </p>
+  <p>
+    What is not done: a security audit, and the mainnet trial that follows it. We
+    would rather say that plainly than take your money first.
+    <a href="https://github.com/R2Rlabs/reins/issues/new?title=Reins+Cloud+early+access">Open an issue</a>
+    if you want an early account, or
+    <a href="/mcp/">run Reins yourself</a> — it is free, open source, and the same
+    risk engine.
+  </p>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>
+      R2R Labs ·
+      <a href="/">Overview</a> ·
+      <a href="/mcp/">MCP server</a> ·
+      <a href="https://github.com/R2Rlabs/reins">Source</a> ·
+      <a href="https://www.npmjs.com/package/@r2rlabs/reins">npm</a>
+    </p>
+    <p class="note">
+      Nothing here is financial advice. Trading perpetuals risks your money. Paper
+      mode exists so you can watch an agent trade without any.
+    </p>
+  </div>
+</footer>
+
+</main>
+</body>
+</html>

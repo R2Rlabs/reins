@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hyperliquid MCP server — let Claude or Cursor trade under limits it cannot change</title>
+<meta name="description" content="Reins is an MCP server for Hyperliquid perpetuals. Connect Claude Desktop, Claude Code or Cursor, and the model gets order tools behind risk limits, a required stop-loss and an audit log. Paper trading is free.">
+<link rel="canonical" href="https://r2rlabs.com/mcp/">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="R2R Labs">
+<meta property="og:url" content="https://r2rlabs.com/mcp/">
+<meta property="og:title" content="Hyperliquid MCP server for Claude, Claude Code and Cursor">
+<meta property="og:description" content="Order tools behind risk limits the model cannot change, a stop-loss on every position, and a record of every decision. Paper trading is free.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Hyperliquid MCP server — Reins">
+<meta name="twitter:description" content="Give an AI agent Hyperliquid order tools behind limits it cannot argue with.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234ADE80' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z'/><path d='M9 12l2 2 4-4'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/style.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Hyperliquid MCP server: let an AI agent trade under limits it cannot change",
+  "description": "How to connect Claude Desktop, Claude Code or Cursor to Hyperliquid perpetuals through the Model Context Protocol, with risk limits enforced outside the model.",
+  "url": "https://r2rlabs.com/mcp/",
+  "author": { "@type": "Organization", "name": "R2R Labs", "url": "https://r2rlabs.com/" },
+  "publisher": { "@type": "Organization", "name": "R2R Labs", "url": "https://r2rlabs.com/" },
+  "about": ["Model Context Protocol", "Hyperliquid", "AI trading agents", "Risk management"]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is an MCP server for Hyperliquid?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "An MCP server gives a model tools it can call. A Hyperliquid MCP server gives it order tools: read the book, place an order, set a stop-loss, close a position. Reins is one, with the difference that every order passes a risk engine the model cannot reach, so limits hold whatever the model decides or is told to do."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can Claude trade crypto for me?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It can place orders through an MCP server like Reins. Whether it should trade unsupervised is a separate question: Reins exists because a model that is confused, jailbroken or simply wrong should still not be able to exceed a position cap, skip a stop-loss or trade past a daily loss limit. Paper mode runs the same rules against live prices with no money at risk."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does the model hold my private key?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Reins runs on your machine and signs with a Hyperliquid API wallet, which can place and cancel orders but cannot withdraw. The model never sees the key, and revoking the API wallet on Hyperliquid cuts it off immediately."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What happens when the agent tries to break a limit?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The order is refused and the refusal names the rule, for example BLOCKED (POSITION_TOO_LARGE). The attempt is written to the decision log with the reason the agent gave, so a blocked attempt is recorded as carefully as a fill."
+      }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <a class="brand" href="/">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.4-3 8.4-7 10-4-1.6-7-5.6-7-10V6l7-3z"></path><path d="M9 12l2 2 4-4"></path></svg>
+      Reins
+    </a>
+    <nav>
+      <a href="/">Overview</a>
+      <a href="/mcp/">MCP server</a>
+      <a href="/cloud/">Hosted</a>
+      <a href="https://www.npmjs.com/package/@r2rlabs/reins">npm</a>
+      <a href="https://github.com/R2Rlabs/reins">Source</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section>
+  <div class="pill"><span class="dot"></span> Model Context Protocol</div>
+  <h1>A Hyperliquid MCP server with the limits outside the model</h1>
+  <p class="lede">
+    Reins gives Claude, Claude Code, Cursor or any MCP client a set of Hyperliquid
+    trading tools. Every order it places goes through a risk engine in a different
+    process, so the position cap, the stop-loss requirement and the daily loss
+    limit hold whatever the model decides — or is persuaded to do.
+  </p>
+  <span class="cmd"><span class="prompt">$ </span>npx @r2rlabs/reins init</span>
+  <div class="actions">
+    <a class="btn btn-primary" href="https://www.npmjs.com/package/@r2rlabs/reins">Install from npm</a>
+    <a class="btn btn-ghost" href="https://github.com/R2Rlabs/reins">Read the source</a>
+  </div>
+</section>
+
+<section id="connect">
+  <h2>Connecting it</h2>
+  <p>
+    <code>init</code> writes the config for the client you pick and starts in paper
+    mode: simulated fills on live prices, no money at risk. To wire it by hand,
+    point any MCP client at the server:
+  </p>
+<pre>{
+  "mcpServers": {
+    "reins": {
+      "command": "npx",
+      "args": ["-y", "@r2rlabs/reins", "serve"],
+      "env": { "REINS_NETWORK": "testnet", "REINS_SYMBOLS": "BTC,ETH" }
+    }
+  }
+}</pre>
+  <p>
+    Paper and testnet need no key at all. Live trading signs with a Hyperliquid
+    <strong>API wallet</strong>, which can place and cancel orders but cannot
+    withdraw — and which you can revoke on Hyperliquid at any moment, cutting the
+    agent off without asking anyone.
+  </p>
+</section>
+
+<section id="tools">
+  <h2>The tools a model gets</h2>
+  <div class="rows">
+    <div class="row"><div><code>get_limits</code></div><p>The limits in force and the room left under each</p></div>
+    <div class="row"><div><code>get_positions</code></div><p>Open positions, PnL, and which have no stop-loss</p></div>
+    <div class="row"><div><code>get_book</code>, <code>get_candles</code></div><p>Market data for sizing and timing</p></div>
+    <div class="row"><div><code>place_order</code></div><p>Checked against every limit before it reaches the exchange</p></div>
+    <div class="row"><div><code>set_stop_loss</code></div><p>Protect a position, replacing any stop already there</p></div>
+    <div class="row"><div><code>cancel_order</code>, <code>close_position</code></div><p>Always allowed: they only lower risk</p></div>
+    <div class="row"><div><code>get_recent_decisions</code></div><p>Its own record, including what was refused</p></div>
+  </div>
+  <p>
+    There is deliberately no tool for changing a limit. An agent that could raise
+    its own position cap has no cap, and prompt injection is a real attack on
+    anything that trades: the whole point is that the rules live where the model's
+    context cannot reach them.
+  </p>
+</section>
+
+<section id="rules">
+  <h2>What it refuses</h2>
+  <p>Each refusal names its rule, so an agent corrects itself instead of retrying blindly.</p>
+  <div class="rows">
+    <div class="row"><div><code>POSITION_TOO_LARGE</code></div><p>Past the cap for that asset, counting what is already held</p></div>
+    <div class="row"><div><code>NO_STOP_LOSS</code></div><p>An order that opens or adds without a stop attached</p></div>
+    <div class="row"><div><code>SYMBOL_NOT_ALLOWED</code></div><p>An asset outside the allowlist, which the message prints</p></div>
+    <div class="row"><div><code>DAILY_LOSS_LIMIT</code></div><p>Realised losses hit the day's limit; only closing orders pass</p></div>
+    <div class="row"><div><code>RATE_LIMIT</code></div><p>More orders a minute than a strategy has reasons for</p></div>
+  </div>
+</section>
+
+<section id="log">
+  <h2>Every attempt on the record</h2>
+  <p>
+    The decision log keeps what the agent tried, the reason it gave in its own
+    words, what the risk engine said and what the exchange did. Refusals are kept
+    as carefully as fills — "the agent tried six times its position cap at 3am, and
+    here is what it said it was doing" is the single most useful thing this can
+    tell you, and it only exists if refusals are written down.
+  </p>
+  <p>
+    The stated reason is testimony, not proof: a model can rationalise after the
+    fact. It is still the only record of why, and it is worth having.
+  </p>
+</section>
+
+<section id="hosted">
+  <h2>If you would rather not run it</h2>
+  <p>
+    <a href="/cloud/">Reins Cloud</a> is the same engine as a service: keys in a
+    KMS, an owner login with two-factor, alerts by email, Telegram and SMS, orders
+    over a size you choose held for your approval, and one URL your agent connects
+    to. <a href="/">Reins itself</a> stays free and open source.
+  </p>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>
+      R2R Labs ·
+      <a href="/">Overview</a> ·
+      <a href="/cloud/">Hosted</a> ·
+      <a href="https://github.com/R2Rlabs/reins">Source</a> ·
+      <a href="https://www.npmjs.com/package/@r2rlabs/reins">npm</a>
+    </p>
+    <p class="note">
+      Nothing here is financial advice. Trading perpetuals risks your money; paper
+      mode exists so you can watch an agent trade without any.
+    </p>
+  </div>
+</footer>
+
+</main>
+</body>
+</html>
