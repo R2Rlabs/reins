@@ -78,6 +78,22 @@
   ]
 }
 </script>
+<!-- Google Analytics (GA4). IP anonymisation is on by default in GA4;
+     ad personalisation signals are switched off, so this sets no advertising
+     cookies and the page stays consent-banner free. -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RQR4VZLY58"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('consent', 'default', {
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+    analytics_storage: 'granted'
+  });
+  gtag('config', 'G-RQR4VZLY58', { anonymize_ip: true });
+</script>
 </head>
 <body>
 
