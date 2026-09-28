@@ -1,0 +1,101 @@
+# Retires an old name in the MCP Registry (registry.modelcontextprotocol.io).
+#
+# Reins was first published as io.github.R2Rlabs/reins and later renamed to
+# io.github.R2Rlabs/hyperliquid-reins, which left two entries for one server:
+# searches split between them and the old one still shows an older version.
+# This marks the old name deprecated, with a message pointing at the new one.
+#
+# Run it by hand from the Actions tab. No secrets: GitHub's OIDC token proves
+# to the registry that this repository owns the io.github.R2Rlabs/ namespace,
+# the same way the publish workflow does.
+name: Deprecate an MCP Registry entry
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: The registry name to change, e.g. io.github.R2Rlabs/reins
+        required: true
+        type: string
+      status:
+        description: What it becomes
+        required: true
+        default: deprecated
+        type: choice
+        options:
+          - deprecated
+          - deleted
+          - active
+      message:
+        description: Why, shown to anyone who finds the old entry
+        required: false
+        default: Renamed to io.github.R2Rlabs/hyperliquid-reins; use that instead.
+        type: string
+
+jobs:
+  deprecate:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Refuse to touch the name we actually publish
+        env:
+          TARGET: ${{ inputs.server_name }}
+        run: |
+          if [ "$TARGET" = "io.github.R2Rlabs/hyperliquid-reins" ] && [ "${{ inputs.status }}" != "active" ]; then
+            echo "That is the current name. Deprecating it would delist Reins."
+            exit 1
+          fi
+          case "$TARGET" in
+            io.github.R2Rlabs/*) ;;
+            *) echo "Only io.github.R2Rlabs/ names belong to this repository."; exit 1 ;;
+          esac
+
+      - name: Get a GitHub OIDC token
+        id: oidc
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken("https://registry.modelcontextprotocol.io");
+            core.setSecret(token);
+            core.setOutput("token", token);
+
+      - name: Exchange it for a registry token
+        id: registry
+        env:
+          OIDC: ${{ steps.oidc.outputs.token }}
+        run: |
+          response=$(curl -sS -X POST "https://registry.modelcontextprotocol.io/v0/auth/github-oidc" \
+            -H "content-type: application/json" \
+            -d "{\"oidc_token\":\"$OIDC\"}")
+          token=$(echo "$response" | jq -r '.registry_token // .token // empty')
+          if [ -z "$token" ]; then
+            echo "Could not get a registry token: $response"
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Change the status
+        env:
+          TOKEN: ${{ steps.registry.outputs.token }}
+          TARGET: ${{ inputs.server_name }}
+        run: |
+          encoded=$(printf '%s' "$TARGET" | jq -sRr @uri)
+          body=$(jq -nc --arg s "${{ inputs.status }}" --arg m "${{ inputs.message }}" \
+            '{status: $s} + (if $m == "" then {} else {statusMessage: $m} end)')
+          code=$(curl -sS -o response.json -w '%{http_code}' \
+            -X PATCH "https://registry.modelcontextprotocol.io/v0.1/servers/$encoded/status" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "content-type: application/json" \
+            -d "$body")
+          echo "HTTP $code"
+          cat response.json
+          [ "$code" = "200" ] || exit 1
+
+      - name: Show what the registry now says
+        run: |
+          curl -sS "https://registry.modelcontextprotocol.io/v0/servers?search=R2Rlabs&limit=100" \
+            | jq -r '.servers[] | select(.server.name | startswith("io.github.R2Rlabs")) | "\(.server.name) \(.server.version) \(._meta["io.modelcontextprotocol.registry/official"].status)"'
