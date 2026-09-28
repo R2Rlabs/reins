@@ -1,0 +1,39 @@
+# The Reins MCP server in a container, for anything that starts the server and
+# asks what tools it has: Glama's checks, MCP inspectors, hosts that run tools
+# in Docker rather than with npx.
+#
+# It boots with no configuration: paper mode on testnet prices, with example
+# limits, so nothing is signed and no key is needed. Override them at run time
+# to use it for real:
+#
+#   docker run -i --rm \
+#     -e REINS_SYMBOLS=BTC,ETH -e REINS_MAX_POSITION_USD=5000 \
+#     -e REINS_DAILY_LOSS_USD=500 reins
+#
+# Live trading additionally needs REINS_MODE=live, REINS_NETWORK=mainnet,
+# REINS_ACCOUNT_ADDRESS and an API wallet key in REINS_PRIVATE_KEY. Pass those
+# at run time; nothing secret belongs in an image.
+FROM node:24-slim
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY tsconfig.json tsconfig.build.json ./
+COPY src ./src
+RUN npm run build && npm prune --omit=dev
+
+# Safe defaults, so the server starts and can be introspected as it is.
+ENV REINS_MODE=paper \
+    REINS_NETWORK=testnet \
+    REINS_SYMBOLS=BTC,ETH \
+    REINS_MAX_POSITION_USD=5000 \
+    REINS_DAILY_LOSS_USD=500 \
+    REINS_MAX_LEVERAGE=3
+
+# The official image's unprivileged user.
+USER node
+
+# MCP over stdio: stdout carries the protocol, so the server logs to stderr.
+CMD ["node", "dist/bin/serve.js"]
