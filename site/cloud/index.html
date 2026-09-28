@@ -56,7 +56,7 @@
       "name": "Who holds the private key?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "The agent never does. Reins Cloud creates a Hyperliquid API wallet whose key is generated inside AWS KMS and never leaves it: the service can ask KMS to sign a specific order, but cannot export the key. An API wallet can place and cancel orders but cannot withdraw, and you can revoke it on Hyperliquid at any time."
+        "text": "The agent never does. In production the API wallet key is generated inside AWS KMS and never leaves it, so the service can ask for a signature on a specific order but cannot export the key. That path is built and tested against a stand-in and has not yet run against a live KMS; the current testnet build encrypts the key in its database instead, and refuses to run live mode that way. An API wallet cannot withdraw in any case, and you can revoke it on Hyperliquid at any time."
       }
     },
     {
@@ -100,16 +100,17 @@
 <main class="wrap">
 
 <section>
-  <div class="pill"><span class="dot"></span> In testing on Hyperliquid testnet</div>
+  <div class="pill"><span class="dot"></span> In development — not open yet</div>
   <h1>A human in the loop, for agents that trade while you sleep</h1>
   <p class="lede">
-    Reins Cloud runs the same risk engine as <a href="/">Reins</a>, hosted. Your
-    agent connects to one URL with an API key. Limits it cannot change hold every
-    order, anything over a size you choose waits for you to approve it, and a kill
-    switch stops it dead — a switch any key can pull and only your login can reset.
+    Reins Cloud is the same risk engine as <a href="/">Reins</a>, hosted: an agent
+    connects to one URL with an API key, limits it cannot change hold every order,
+    anything over a size you choose waits for your approval, and a kill switch
+    stops it dead. It is being built in the open and is not open for sign-ups yet;
+    <a href="#state">what has and has not run</a> is set out below.
   </p>
   <div class="actions">
-    <a class="btn btn-primary" href="https://github.com/R2Rlabs/reins/issues/new?title=Reins+Cloud+early+access">Ask for early access</a>
+    <a class="btn btn-primary" href="https://github.com/R2Rlabs/reins/issues/new?title=Reins+Cloud+early+access">Tell us to keep you posted</a>
     <a class="btn btn-ghost" href="/mcp/">Run it yourself instead</a>
   </div>
 </section>
@@ -131,7 +132,7 @@
     </article>
     <article class="card">
       <h3>Keys you can prove nobody holds</h3>
-      <p>Each agent gets a Hyperliquid API wallet whose key is created inside a KMS and never exported. The service asks the KMS to sign a specific order; it cannot read the key. API wallets cannot withdraw, and you can revoke one on Hyperliquid without asking us.</p>
+      <p>Each agent gets a Hyperliquid API wallet. In production its key is created inside a KMS and never exported, so the service can ask for a signature but cannot read the key — that path is written and tested against a stand-in, not yet against a live KMS. Testnet today uses a weaker vault: the key encrypted in the database, which live mode refuses to start on. Either way an API wallet cannot withdraw, and you can revoke one on Hyperliquid without asking us.</p>
     </article>
     <article class="card">
       <h3>Told before you notice</h3>
@@ -181,20 +182,27 @@
 </section>
 
 <section id="state">
-  <h2>Where it is</h2>
+  <h2>Where it is, plainly</h2>
   <p>
-    Honestly: in testing. The engine, the dashboard, human approval, the alerts,
-    the audit log and the MCP endpoint are built, and the whole path has traded on
-    Hyperliquid testnet — a real order signed by a KMS-held wallet, a stop resting
-    on the exchange, closed and reconciled against the exchange's own record.
+    In development. It runs on one machine, has no users, and is not open for
+    sign-ups. The engine, the dashboard, human approval, the alerts, the audit
+    log and the MCP endpoint are built and covered by around 430 tests.
   </p>
   <p>
-    What is not done: a security audit, and the mainnet trial that follows it. We
-    would rather say that plainly than take your money first.
-    <a href="https://github.com/R2Rlabs/reins/issues/new?title=Reins+Cloud+early+access">Open an issue</a>
-    if you want an early account, or
-    <a href="/mcp/">run Reins yourself</a> — it is free, open source, and the same
-    risk engine.
+    What has actually happened on an exchange: one end-to-end run on Hyperliquid
+    testnet. A wallet signed the agent approval, Hyperliquid accepted it, an order
+    filled with a stop resting on the exchange, and the fills reconciled against
+    Hyperliquid's own record.
+  </p>
+  <p>
+    What has not: a live KMS, real email, SMS and Telegram delivery, any
+    deployment beyond a laptop, a second user, a security audit, and mainnet.
+    Those come before anyone is asked for money or keys.
+  </p>
+  <p>
+    <a href="https://github.com/R2Rlabs/reins/issues/new?title=Reins+Cloud+early+access">Say if you want to hear when it opens</a>,
+    or <a href="/mcp/">run Reins yourself today</a> — free, open source, the same
+    risk engine, and it needs nobody's permission.
   </p>
 </section>
 
