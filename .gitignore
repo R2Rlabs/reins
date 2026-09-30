@@ -25,3 +25,7 @@ CLAUDE.md
 
 # Local-only tooling: the daily interest report and its history.
 local/
+
+# Python client build output.
+clients/python/dist/
+clients/python/**/__pycache__/

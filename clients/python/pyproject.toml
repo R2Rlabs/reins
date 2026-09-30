@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "reins-client"
+version = "0.1.0"
+description = "Risk limits and an audit log for Python trading bots on Hyperliquid, through a Reins server."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "R2R Labs" }]
+keywords = ["hyperliquid", "trading", "risk", "agent", "bot", "mcp"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Financial and Insurance Industry",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://r2rlabs.com"
+Documentation = "https://r2rlabs.com/mcp/"
+Source = "https://github.com/R2Rlabs/reins"
+Issues = "https://github.com/R2Rlabs/reins/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["reins"]
