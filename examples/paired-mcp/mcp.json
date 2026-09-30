@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "hyperliquid-gateway": {
+      "command": "hyperliquid-agent-gateway"
+    },
+    "reins": {
+      "command": "npx",
+      "args": ["-y", "@r2rlabs/reins", "serve"],
+      "env": {
+        "REINS_MODE": "paper",
+        "REINS_NETWORK": "mainnet",
+        "REINS_SYMBOLS": "BTC,ETH",
+        "REINS_MAX_POSITION_USD": "5000",
+        "REINS_DAILY_LOSS_USD": "500",
+        "REINS_MAX_TRADE_RISK_USD": "50",
+        "REINS_REQUIRE_STOP_LOSS": "true"
+      }
+    }
+  }
+}
