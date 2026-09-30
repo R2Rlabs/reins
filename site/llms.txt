@@ -9,21 +9,22 @@ reach, so they hold whatever the agent decides or is told to do.
 - https://r2rlabs.com/ — what Reins is, what it refuses, and the demo run's numbers.
 - https://r2rlabs.com/mcp/ — the Hyperliquid MCP server: connecting Claude, Claude
   Code or Cursor, the tools a model gets, and the rules that refuse it.
-- https://r2rlabs.com/cloud/ — Reins Cloud, the hosted version: keys in a KMS,
-  human approval on large orders, a kill switch only an owner resets, alerts by
-  email, Telegram and SMS.
+- https://r2rlabs.com/cloud/ — Reins Cloud, the hosted version being built: human
+  approval on large orders, a kill switch only an owner resets, alerts by email,
+  Telegram and SMS, and what has and has not run so far.
 
 ## Facts
 
 - Reins is free and open source (MIT): https://github.com/R2Rlabs/reins
 - Install: npx @r2rlabs/reins init — https://www.npmjs.com/package/@r2rlabs/reins
-- Listed in the MCP Registry as io.github.R2Rlabs/reins
+- Listed in the MCP Registry as io.github.R2Rlabs/hyperliquid-reins
 - Paper trading is free and needs no key: simulated fills on live prices, same limits.
 - Live trading pays 2 basis points of the volume it protects, as a Hyperliquid
   builder fee. There is no subscription.
 - An agent signs with a Hyperliquid API wallet, which can trade but cannot withdraw.
-- Reins Cloud is in testing: the whole path has traded on Hyperliquid testnet, and
-  a security audit and mainnet trial come before real money.
+- Reins Cloud is in development and not open for sign-ups. It has traded on
+  Hyperliquid testnet, signed by a fallback vault; the production key custody is
+  not built, and a security audit and mainnet trial come before real money.
 
 ## Not
 
