@@ -12,6 +12,13 @@ export {
   type PlaceOrderParams,
 } from "./client.js";
 
+export {
+  REINS_BUILDER,
+  REINS_BUILDER_ADDRESS,
+  DEFAULT_BUILDER_FEE_TENTHS_BPS,
+  feeApprovalProblem,
+} from "./builder-fee.js";
+
 export { RiskEngine, projectedPositionUsd, projectedTotalExposureUsd } from "./risk.js";
 export type {
   AccountState,
