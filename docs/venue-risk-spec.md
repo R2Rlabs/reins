@@ -23,7 +23,7 @@ Hyperliquid returns `liquidationPx` per position, so the field is one line of
 parsing away, but it has to be carried through four types before `RiskEngine`
 can see it. None of the five limits is a change to `src/risk.ts` alone.
 
-## 1. Liquidation distance — build this one first
+## 1. Liquidation distance — built 2026-09-30
 
 Refuse an order that leaves, or would leave, the liquidation price within X% of
 mark.
@@ -94,9 +94,14 @@ Bound total risk across correlated perps rather than per market.
 
 ## Order of work
 
-1. Parse `liquidationPx` and margin mode; carry both through `PositionSnapshot`
-   and `AccountState`; surface them in `get_positions`. Nothing refuses yet.
-2. Liquidation distance as a refusal on current state (`LIQUIDATION_TOO_CLOSE`).
+1. ~~Parse `liquidationPx` and margin mode; carry both through
+   `PositionSnapshot` and `AccountState`; surface them in `get_positions`.~~ Done.
+2. ~~Liquidation distance as a refusal on current state
+   (`LIQUIDATION_TOO_CLOSE`), configured by `REINS_MIN_LIQUIDATION_DISTANCE_PCT`.~~
+   Done. It refuses on the state as it stands, not on where the order would move
+   it, and the banner says so. Paper reports no liquidation price and the engine
+   treats a missing number as unknown rather than safe, so nothing is enforced
+   there — also said in the banner rather than left to be discovered.
 3. Cross vs isolated correctness.
 4. Projected liquidation after the order.
 5. Funding cap.

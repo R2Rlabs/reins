@@ -8,6 +8,7 @@ import type {
   CandleInterval,
   L2Book,
   OrderOutcome,
+  PositionSnapshot,
   StopLoss,
 } from "./types.js";
 
@@ -45,6 +46,13 @@ export interface TradingClient {
    * order filling hours after it was placed.
    */
   fillsSince(startTime: number): Promise<AccountFill[]>;
+  /**
+   * Positions with whatever the venue reports about liquidation. Optional
+   * because paper trading has no margin engine: it reports nothing rather
+   * than inventing a liquidation price, and anything reading this must treat
+   * a missing answer as unknown rather than safe.
+   */
+  positionSnapshot?(): Promise<PositionSnapshot>;
 }
 
 /**

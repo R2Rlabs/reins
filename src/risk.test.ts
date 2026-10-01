@@ -292,3 +292,88 @@ describe("requireStopLoss", () => {
     ).toEqual({ allowed: true });
   });
 });
+
+describe("minLiquidationDistancePct", () => {
+  const guarded: RiskLimits = { ...limits, minLiquidationDistancePct: 10 };
+
+  const nearLiquidation: AccountState = {
+    positionsUsd: { BTC: 15_000 },
+    realizedPnlTodayUsd: 0,
+    accountValueUsd: 20_000,
+    liquidationDistancePct: { BTC: 4.2 },
+  };
+
+  it("refuses more risk while a position sits inside the distance", () => {
+    const engine = new RiskEngine(guarded);
+    const decision = engine.check({ symbol: "BTC", side: "buy", sizeUsd: 1_000 }, nearLiquidation);
+    expect(decision).toEqual({
+      allowed: false,
+      code: "LIQUIDATION_TOO_CLOSE",
+      reason:
+        "BTC is 4.20% from liquidation, inside the 10% required before adding risk. " +
+        "Reduce it or add margin first.",
+    });
+  });
+
+  it("names the nearest position, not just the one being traded", () => {
+    const engine = new RiskEngine(guarded);
+    const state: AccountState = {
+      ...nearLiquidation,
+      positionsUsd: { BTC: 15_000, ETH: 2_000 },
+      liquidationDistancePct: { BTC: 8, ETH: 1.5 },
+    };
+    const decision = engine.check({ symbol: "BTC", side: "buy", sizeUsd: 500 }, state);
+    expect(decision.allowed).toBe(false);
+    if (decision.allowed) return;
+    // Cross margin means a new BTC order draws on the margin keeping ETH alive.
+    expect(decision.reason).toContain("ETH is 1.50%");
+  });
+
+  it("still allows an order that reduces the position", () => {
+    const engine = new RiskEngine(guarded);
+    expect(
+      engine.check(
+        { symbol: "BTC", side: "sell", sizeUsd: 5_000, reduceOnly: true },
+        nearLiquidation,
+      ).allowed,
+    ).toBe(true);
+  });
+
+  it("allows an order that shrinks exposure without being marked reduce-only", () => {
+    const engine = new RiskEngine(guarded);
+    expect(
+      engine.check({ symbol: "BTC", side: "sell", sizeUsd: 5_000 }, nearLiquidation).allowed,
+    ).toBe(true);
+  });
+
+  it("allows new risk once the position is far enough away", () => {
+    const engine = new RiskEngine(guarded);
+    const state = { ...nearLiquidation, liquidationDistancePct: { BTC: 22 } };
+    expect(engine.check({ symbol: "BTC", side: "buy", sizeUsd: 1_000 }, state).allowed).toBe(true);
+  });
+
+  it("treats a venue that reports nothing as unknown, not unsafe", () => {
+    const engine = new RiskEngine(guarded);
+    const paperLike: AccountState = {
+      positionsUsd: { BTC: 15_000 },
+      realizedPnlTodayUsd: 0,
+      accountValueUsd: 20_000,
+    };
+    expect(engine.check({ symbol: "BTC", side: "buy", sizeUsd: 1_000 }, paperLike).allowed).toBe(
+      true,
+    );
+  });
+
+  it("does nothing unless the limit is set", () => {
+    const engine = new RiskEngine(limits);
+    expect(
+      engine.check({ symbol: "BTC", side: "buy", sizeUsd: 1_000 }, nearLiquidation).allowed,
+    ).toBe(true);
+  });
+
+  it("ignores a distance that is not a number", () => {
+    const engine = new RiskEngine(guarded);
+    const state = { ...nearLiquidation, liquidationDistancePct: { BTC: Number.NaN } };
+    expect(engine.check({ symbol: "BTC", side: "buy", sizeUsd: 1_000 }, state).allowed).toBe(true);
+  });
+});

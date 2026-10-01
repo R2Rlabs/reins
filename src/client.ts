@@ -23,6 +23,7 @@ import {
   type Network,
   type OrderAction,
   type OrderOutcome,
+  type LiquidationState,
   type PositionSnapshot,
   type StopLoss,
   type Tif,
@@ -242,21 +243,43 @@ export class HyperliquidClient {
   async positionSnapshot(user?: string): Promise<PositionSnapshot> {
     const [state, mode] = await Promise.all([this.clearinghouseState(user), this.accountAbstraction(user)]);
     const positionsUsd: Record<string, number> = {};
+    const liquidation: Record<string, LiquidationState> = {};
     let unrealizedUsd = 0;
     for (const { position } of state.assetPositions) {
       const notional = Math.abs(Number(position.positionValue));
+      const size = Math.abs(Number(position.szi));
       const direction = Number(position.szi) < 0 ? -1 : 1;
       positionsUsd[position.coin] = direction * notional;
       unrealizedUsd += Number(position.unrealizedPnl);
+
+      // Mark comes from the position itself — notional / size — so this needs
+      // no second call. A position with no liquidation price cannot be
+      // liquidated, so there is nothing to report.
+      const liquidationPx = Number(position.liquidationPx);
+      if (size > 0 && Number.isFinite(liquidationPx) && liquidationPx > 0) {
+        const markUsd = notional / size;
+        liquidation[position.coin] = {
+          priceUsd: liquidationPx,
+          markUsd,
+          distancePct: (Math.abs(markUsd - liquidationPx) / markUsd) * 100,
+          ...(position.leverage ? { marginMode: position.leverage.type } : {}),
+        };
+      }
     }
+    const liquidationField = Object.keys(liquidation).length > 0 ? { liquidation } : {};
     if (mode === "unifiedAccount" || mode === "portfolioMargin") {
       const spot = await this.spotClearinghouseState(user);
       const usdc = spot.balances.find((b) => b.token === USDC_TOKEN);
-      return { positionsUsd, accountValueUsd: Number(usdc?.total ?? 0) + unrealizedUsd };
+      return {
+        positionsUsd,
+        accountValueUsd: Number(usdc?.total ?? 0) + unrealizedUsd,
+        ...liquidationField,
+      };
     }
     return {
       positionsUsd,
       accountValueUsd: Number(state.marginSummary.accountValue),
+      ...liquidationField,
     };
   }
 
@@ -365,7 +388,17 @@ export class HyperliquidClient {
       this.positionSnapshot(user),
       this.realizedPnlToday(user),
     ]);
-    return { ...snapshot, realizedPnlTodayUsd };
+    const { liquidation, ...rest } = snapshot;
+    // The engine wants one number per symbol; the full state stays on the
+    // snapshot for anything that wants to show it.
+    const liquidationDistancePct = liquidation
+      ? Object.fromEntries(Object.entries(liquidation).map(([coin, l]) => [coin, l.distancePct]))
+      : undefined;
+    return {
+      ...rest,
+      realizedPnlTodayUsd,
+      ...(liquidationDistancePct ? { liquidationDistancePct } : {}),
+    };
   }
 
   // --- exchange ------------------------------------------------------------

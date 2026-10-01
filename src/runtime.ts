@@ -53,6 +53,9 @@ export function readLimits(): RiskLimits {
     maxOrdersPerMinute: num("REINS_MAX_ORDERS_PER_MIN", 12),
     requireStopLoss: flag("REINS_REQUIRE_STOP_LOSS"),
     // Optional: without it, only the position cap limits a trade.
+    ...(process.env["REINS_MIN_LIQUIDATION_DISTANCE_PCT"]
+      ? { minLiquidationDistancePct: num("REINS_MIN_LIQUIDATION_DISTANCE_PCT") }
+      : {}),
     ...(process.env["REINS_MAX_TRADE_RISK_USD"]
       ? { maxTradeRiskUsd: num("REINS_MAX_TRADE_RISK_USD") }
       : {}),
@@ -161,6 +164,13 @@ export async function buildRuntime(): Promise<Runtime> {
       limits.maxTradeRiskUsd === undefined
         ? "not limited (set REINS_MAX_TRADE_RISK_USD)"
         : `$${limits.maxTradeRiskUsd.toLocaleString()} if the stop fills`
+    }\n` +
+    `  liquidation     ${
+      limits.minLiquidationDistancePct === undefined
+        ? "not limited (set REINS_MIN_LIQUIDATION_DISTANCE_PCT)"
+        : mode === "paper"
+          ? `${limits.minLiquidationDistancePct}% minimum — paper has no margin engine, so nothing is enforced`
+          : `${limits.minLiquidationDistancePct}% from mark required before adding risk`
     }\n` +
     `  symbols         ${limits.symbolAllowlist.join(", ")}\n` +
     `  builder fee     ${

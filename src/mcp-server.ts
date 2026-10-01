@@ -210,8 +210,20 @@ async function stateForRisk(deps: McpServerDeps): Promise<AccountState> {
 
 export function getPositions(deps: McpServerDeps): Promise<ToolResult> {
   return guard(async () => {
-    const state = await deps.client.accountState();
+    const [state, snapshot] = await Promise.all([
+      deps.client.accountState(),
+      deps.client.positionSnapshot?.(),
+    ]);
     const { stops, unprotected } = await protection(deps);
+    // Shown whether or not a limit is set on it: an agent that can see how
+    // close the exchange is to closing a position can act before it does.
+    const liquidation = Object.entries(snapshot?.liquidation ?? {}).map(([symbol, l]) => ({
+      symbol,
+      liquidationPrice: l.priceUsd,
+      markPrice: round(l.markUsd),
+      distancePct: round(l.distancePct),
+      ...(l.marginMode ? { marginMode: l.marginMode } : {}),
+    }));
     return ok({
       positionsUsd: Object.fromEntries(
         Object.entries(state.positionsUsd).map(([k, v]) => [k, round(v)]),
@@ -226,6 +238,7 @@ export function getPositions(deps: McpServerDeps): Promise<ToolResult> {
         triggerPrice: stop.triggerPrice,
       })),
       unprotected,
+      ...(liquidation.length > 0 ? { liquidation } : {}),
     });
   });
 }

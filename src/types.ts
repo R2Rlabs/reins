@@ -29,6 +29,15 @@ export interface AssetPosition {
     positionValue: string;
     unrealizedPnl: string;
     marginUsed: string;
+    /**
+     * Where the exchange closes this position. Null when nothing can liquidate
+     * it — no position, or fully margined. This is the number the exchange acts
+     * on, which is why a position can sit inside every notional limit and still
+     * be one wick from being closed.
+     */
+    liquidationPx?: string | null;
+    /** Cross shares the account's margin; isolated can only lose its own. */
+    leverage?: { type: "cross" | "isolated"; value: number };
   };
 }
 
@@ -276,4 +285,21 @@ export interface PositionSnapshot {
   /** Signed notional per symbol, in USD. Negative is short. */
   positionsUsd: Record<string, number>;
   accountValueUsd: number;
+  /**
+   * How close each position sits to being liquidated, as a percentage of mark.
+   * Absent for a venue that does not report it — paper trading has no margin
+   * engine, so it reports nothing rather than guessing.
+   */
+  liquidation?: Record<string, LiquidationState>;
+}
+
+export interface LiquidationState {
+  /** Where the exchange would close the position. */
+  priceUsd: number;
+  /** Mark price now, derived from the position's own notional and size. */
+  markUsd: number;
+  /** Distance from mark to that price, as a percentage of mark. */
+  distancePct: number;
+  /** Cross shares the account's margin; isolated can only lose its own. */
+  marginMode?: "cross" | "isolated";
 }

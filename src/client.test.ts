@@ -375,6 +375,69 @@ describe("account state", () => {
     expect(snapshot.accountValueUsd).toBeCloseTo(13_109.482328, 5);
   });
 
+  describe("liquidation distance", () => {
+    // A long whose liquidation price sits 10% under mark, and a short whose
+    // sits 5% over: what the exchange would do, not what the notional says.
+    const NEAR: ClearinghouseState = {
+      assetPositions: [
+        {
+          position: {
+            coin: "BTC",
+            szi: "0.25",
+            entryPx: "50000",
+            positionValue: "12500",
+            unrealizedPnl: "0",
+            marginUsed: "2500",
+            liquidationPx: "45000",
+            leverage: { type: "cross", value: 5 },
+          },
+        },
+        {
+          position: {
+            coin: "ETH",
+            szi: "-1",
+            entryPx: "2000",
+            positionValue: "2000",
+            unrealizedPnl: "0",
+            marginUsed: "400",
+            liquidationPx: "2100",
+            leverage: { type: "isolated", value: 5 },
+          },
+        },
+      ],
+      marginSummary: { accountValue: "5000", totalMarginUsed: "2900", totalNtlPos: "14500", totalRawUsd: "5000" },
+      withdrawable: "2100",
+    };
+
+    it("works the distance out from the position's own mark", async () => {
+      transport.reply("info:clearinghouseState", NEAR);
+      const snapshot = await client().positionSnapshot();
+      // mark = positionValue / |szi| = 50,000; 45,000 is 10% below it.
+      expect(snapshot.liquidation?.["BTC"]).toEqual({
+        priceUsd: 45_000,
+        markUsd: 50_000,
+        distancePct: 10,
+        marginMode: "cross",
+      });
+      // A short is liquidated above mark, and the distance is still positive.
+      expect(snapshot.liquidation?.["ETH"]?.distancePct).toBeCloseTo(5, 6);
+      expect(snapshot.liquidation?.["ETH"]?.marginMode).toBe("isolated");
+    });
+
+    it("passes one number per symbol to the risk engine", async () => {
+      transport.reply("info:clearinghouseState", NEAR).reply("info:userFills", []);
+      const state = await client().accountState();
+      expect(state.liquidationDistancePct?.["BTC"]).toBeCloseTo(10, 6);
+      expect(state.liquidationDistancePct?.["ETH"]).toBeCloseTo(5, 6);
+    });
+
+    it("reports nothing for a position the exchange cannot liquidate", async () => {
+      transport.reply("info:clearinghouseState", STATE);
+      // The older fixture carries no liquidationPx at all.
+      expect((await client().positionSnapshot()).liquidation).toBeUndefined();
+    });
+  });
+
   describe("in a Unified account", () => {
     // What the builder account returned on mainnet, 2026-09-21, while Unified:
     // perps reads $0 and the deposit sits in spot.

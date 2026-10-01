@@ -33,6 +33,17 @@ export interface RiskLimits {
    * away. Checked against `riskUsd` on orders that add risk.
    */
   maxTradeRiskUsd?: number;
+  /**
+   * How close to liquidation a position may sit before the agent is refused
+   * more risk, as a percentage of mark.
+   *
+   * The other caps measure notional; the exchange measures margin, and they
+   * are not the same thing. A position inside the size cap, under max leverage
+   * and carrying a stop can still be a wick away from being closed by the
+   * exchange — at which point the stop never fires, because the position is
+   * already gone. This is the limit that notices.
+   */
+  minLiquidationDistancePct?: number;
 }
 
 export interface AccountState {
@@ -44,6 +55,13 @@ export interface AccountState {
   accountValueUsd: number;
   /** Symbols holding a position that no stop-loss fully covers. */
   unprotectedSymbols?: string[];
+  /**
+   * How far each position sits from its liquidation price, as a percentage of
+   * mark. Absent where the venue does not report one — paper trading has no
+   * margin engine — and a missing entry is never treated as safe or unsafe,
+   * only as unknown.
+   */
+  liquidationDistancePct?: Record<string, number>;
 }
 
 export interface OrderRequest {
@@ -71,6 +89,7 @@ export type RiskCode =
   | "RATE_LIMITED"
   | "POSITION_TOO_LARGE"
   | "LEVERAGE_TOO_HIGH"
+  | "LIQUIDATION_TOO_CLOSE"
   | "INVALID_ORDER";
 
 export type Decision =
@@ -246,6 +265,27 @@ export class RiskEngine {
           `Would put account leverage at ${leverage.toFixed(2)}x, ` +
           `over the ${this.limits.maxLeverage}x cap.`,
       };
+    }
+
+    const minDistance = this.limits.minLiquidationDistancePct;
+    if (minDistance !== undefined && addsRisk) {
+      const distances = state.liquidationDistancePct ?? {};
+      // Every open position matters, not just this symbol: under cross margin
+      // a new position anywhere draws on the same margin that is keeping the
+      // others alive.
+      const tooClose = Object.entries(distances)
+        .filter(([, distance]) => Number.isFinite(distance) && distance < minDistance)
+        .sort((a, b) => a[1] - b[1]);
+      const nearest = tooClose[0];
+      if (nearest) {
+        return {
+          allowed: false,
+          code: "LIQUIDATION_TOO_CLOSE",
+          reason:
+            `${nearest[0]} is ${nearest[1].toFixed(2)}% from liquidation, inside the ` +
+            `${minDistance}% required before adding risk. Reduce it or add margin first.`,
+        };
+      }
     }
 
     return { allowed: true };
