@@ -29,3 +29,6 @@ local/
 # Python client build output.
 clients/python/dist/
 clients/python/**/__pycache__/
+
+# Recorded market data: the only copy is local, and it is large.
+data/
