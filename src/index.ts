@@ -101,6 +101,7 @@ export type {
   CandleInterval,
   CancelOutcome,
   ClearinghouseState,
+  FundingPoint,
   Meta,
   Network,
   OrderOutcome,

@@ -24,6 +24,7 @@ import {
   type OrderAction,
   type OrderOutcome,
   type LiquidationState,
+  type FundingPoint,
   type PositionSnapshot,
   type StopLoss,
   type Tif,
@@ -295,6 +296,27 @@ export class HyperliquidClient {
    * mainnet when this was written, so both that and a 200 are handled — which
    * becomes an error that says what actually went wrong.
    */
+/**
+   * Hourly funding for a perp between two times, oldest first.
+   *
+   * Positive means longs pay shorts, so a short position is paid to hold.
+   * That is the whole of a carry trade's income, and it is the one return in
+   * this market that does not depend on guessing direction.
+   *
+   * The exchange returns at most 500 hours per call — about three weeks — and
+   * says nothing about having truncated. Anything wanting a longer history has
+   * to walk it in windows, using the last time returned as the next start.
+   */
+  async fundingHistory(coin: string, startTime: number, endTime?: number): Promise<FundingPoint[]> {
+    const points = await this.postInfo<FundingPoint[] | null>({
+      type: "fundingHistory",
+      coin,
+      startTime,
+      ...(endTime === undefined ? {} : { endTime }),
+    });
+    return (points ?? []).sort((a, b) => a.time - b.time);
+  }
+
   async candles(
     coin: string,
     interval: CandleInterval,

@@ -281,6 +281,21 @@ export type CancelOutcome =
  * is deliberately absent — clearinghouseState does not report it, so the
  * caller tracks the day's realised PnL from fills and supplies it.
  */
+/**
+ * One hour of funding on a perp. Hyperliquid charges funding hourly, not
+ * every eight hours as most venues do, so a rate here is already the hourly
+ * fraction: 0.0000125 is 0.00125% an hour, about 11% a year.
+ */
+export interface FundingPoint {
+  coin: string;
+  /** Hourly fraction. Positive means longs pay shorts. */
+  fundingRate: string;
+  /** How far the perp traded from the index over the hour. */
+  premium: string;
+  /** When the funding was applied, ms. */
+  time: number;
+}
+
 export interface PositionSnapshot {
   /** Signed notional per symbol, in USD. Negative is short. */
   positionsUsd: Record<string, number>;
