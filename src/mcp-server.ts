@@ -830,7 +830,7 @@ export const TOOL_NAMES = [
 ] as const;
 
 export function createMcpServer(deps: McpServerDeps): McpServer {
-  const server = new McpServer({ name: "reins", version: "0.1.6" });
+  const server = new McpServer({ name: "reins", version: "0.1.7" });
 
   // Before every tool, write down what the exchange did since the last one: a
   // stop that fired, a resting order that filled. One at a time, so two tools
