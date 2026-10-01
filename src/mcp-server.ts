@@ -7,6 +7,7 @@ import {
   type DecisionLog,
   type DecisionRecord,
 } from "./decision-log.js";
+import { effectiveLimits } from "./risk.js";
 import type { AccountState, Decision, OrderRequest, RiskEngine } from "./risk.js";
 import type { TradingClient } from "./trading-client.js";
 import type { AccountFill, L2Book } from "./types.js";
@@ -156,21 +157,29 @@ export function getLimits(deps: McpServerDeps): Promise<ToolResult> {
   return guard(async () => {
     const state = await deps.client.accountState();
     const limits = deps.engine.configuredLimits;
+    // What the percentages come to against this balance. An agent needs the
+    // dollars it is actually held to, not the configuration.
+    const inForce = effectiveLimits(limits, state.accountValueUsd);
     const exposure = Object.fromEntries(
       Object.entries(state.positionsUsd).map(([symbol, usd]) => [
         symbol,
         {
           currentUsd: round(usd),
-          headroomUsd: round(limits.maxPositionUsd - Math.abs(usd)),
+          headroomUsd: round(inForce.maxPositionUsd - Math.abs(usd)),
         },
       ]),
     );
+    const asPercentages =
+      limits.maxPositionPct !== undefined ||
+      limits.dailyLossLimitPct !== undefined ||
+      limits.maxTradeRiskPct !== undefined;
     return ok({
       limits,
+      ...(asPercentages ? { inForceUsd: { ...inForce, atAccountValueUsd: round(state.accountValueUsd) } } : {}),
       halted: deps.engine.isHalted(state),
       realizedPnlTodayUsd: round(state.realizedPnlTodayUsd),
       lossRemainingUsd: round(
-        limits.dailyLossLimitUsd + Math.min(0, state.realizedPnlTodayUsd),
+        inForce.dailyLossLimitUsd + Math.min(0, state.realizedPnlTodayUsd),
       ),
       ordersRemainingThisMinute: deps.engine.ordersRemaining(),
       accountValueUsd: round(state.accountValueUsd),

@@ -46,13 +46,26 @@ export function readLimits(): RiskLimits {
     );
   }
   return {
-    maxPositionUsd: num("REINS_MAX_POSITION_USD"),
+    maxPositionUsd: process.env["REINS_MAX_POSITION_PCT"]
+      ? num("REINS_MAX_POSITION_USD", Number.POSITIVE_INFINITY)
+      : num("REINS_MAX_POSITION_USD"),
     maxLeverage: num("REINS_MAX_LEVERAGE", 3),
-    dailyLossLimitUsd: num("REINS_DAILY_LOSS_USD"),
+    dailyLossLimitUsd: process.env["REINS_DAILY_LOSS_PCT"]
+      ? num("REINS_DAILY_LOSS_USD", Number.POSITIVE_INFINITY)
+      : num("REINS_DAILY_LOSS_USD"),
     symbolAllowlist: symbols,
     maxOrdersPerMinute: num("REINS_MAX_ORDERS_PER_MIN", 12),
     requireStopLoss: flag("REINS_REQUIRE_STOP_LOSS"),
     // Optional: without it, only the position cap limits a trade.
+    ...(process.env["REINS_MAX_POSITION_PCT"]
+      ? { maxPositionPct: num("REINS_MAX_POSITION_PCT") }
+      : {}),
+    ...(process.env["REINS_DAILY_LOSS_PCT"]
+      ? { dailyLossLimitPct: num("REINS_DAILY_LOSS_PCT") }
+      : {}),
+    ...(process.env["REINS_MAX_TRADE_RISK_PCT"]
+      ? { maxTradeRiskPct: num("REINS_MAX_TRADE_RISK_PCT") }
+      : {}),
     ...(process.env["REINS_MIN_LIQUIDATION_DISTANCE_PCT"]
       ? { minLiquidationDistancePct: num("REINS_MIN_LIQUIDATION_DISTANCE_PCT") }
       : {}),
@@ -71,6 +84,17 @@ export interface Runtime {
   network: Network;
   /** Written to stderr at startup, never stdout: stdout carries MCP. */
   banner: string;
+}
+
+/**
+ * A cap for the banner: the percentage if there is one, the dollars if not,
+ * and both when both are set — because the tighter of the two is what bites,
+ * and an operator reading this should not have to work out which.
+ */
+function cap(usd: number, pct: number | undefined): string {
+  if (pct === undefined) return `${usd.toLocaleString()}`;
+  const ceiling = Number.isFinite(usd) ? `, and never over ${usd.toLocaleString()}` : "";
+  return `${pct}% of account value${ceiling}`;
 }
 
 export async function buildRuntime(): Promise<Runtime> {
@@ -156,14 +180,14 @@ export async function buildRuntime(): Promise<Runtime> {
   const banner =
     `reins on ${network}\n` +
     `  mode            ${modeLine}` +
-    `  max position    $${limits.maxPositionUsd.toLocaleString()}\n` +
-    `  daily loss      $${limits.dailyLossLimitUsd.toLocaleString()}\n` +
+    `  max position    ${cap(limits.maxPositionUsd, limits.maxPositionPct)}\n` +
+    `  daily loss      ${cap(limits.dailyLossLimitUsd, limits.dailyLossLimitPct)}\n` +
     `  max leverage    ${limits.maxLeverage}x\n` +
     `  stop-losses     ${limits.requireStopLoss ? "required on every position" : "optional"}\n` +
     `  risk per trade  ${
-      limits.maxTradeRiskUsd === undefined
-        ? "not limited (set REINS_MAX_TRADE_RISK_USD)"
-        : `$${limits.maxTradeRiskUsd.toLocaleString()} if the stop fills`
+      limits.maxTradeRiskUsd === undefined && limits.maxTradeRiskPct === undefined
+        ? "not limited (set REINS_MAX_TRADE_RISK_USD or _PCT)"
+        : `${cap(limits.maxTradeRiskUsd ?? Number.POSITIVE_INFINITY, limits.maxTradeRiskPct)} if the stop fills`
     }\n` +
     `  liquidation     ${
       limits.minLiquidationDistancePct === undefined

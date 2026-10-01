@@ -44,6 +44,45 @@ export interface RiskLimits {
    * already gone. This is the limit that notices.
    */
   minLiquidationDistancePct?: number;
+  /**
+   * The same three caps, as a percentage of account value instead of a fixed
+   * number of dollars.
+   *
+   * A dollar cap written once goes stale in both directions: it is reckless
+   * after the account halves and pointless after it doubles. A percentage
+   * tracks what you actually have. Where both are set the tighter one wins,
+   * so adding a percentage can never loosen a dollar limit you already had.
+   */
+  maxPositionPct?: number;
+  dailyLossLimitPct?: number;
+  maxTradeRiskPct?: number;
+}
+
+/**
+ * The dollar limits in force right now, with any percentages resolved against
+ * this account value. Exported so get_limits can show an agent the numbers it
+ * is actually being held to rather than the configuration.
+ */
+export function effectiveLimits(
+  limits: RiskLimits,
+  accountValueUsd: number,
+): { maxPositionUsd: number; dailyLossLimitUsd: number; maxTradeRiskUsd?: number } {
+  const fromPct = (pct: number | undefined) =>
+    pct === undefined || !Number.isFinite(accountValueUsd) || accountValueUsd <= 0
+      ? undefined
+      : (pct / 100) * accountValueUsd;
+
+  const tighter = (a: number | undefined, b: number | undefined) =>
+    a === undefined ? b : b === undefined ? a : Math.min(a, b);
+
+  return {
+    maxPositionUsd: tighter(limits.maxPositionUsd, fromPct(limits.maxPositionPct))!,
+    dailyLossLimitUsd: tighter(limits.dailyLossLimitUsd, fromPct(limits.dailyLossLimitPct))!,
+    ...(() => {
+      const risk = tighter(limits.maxTradeRiskUsd, fromPct(limits.maxTradeRiskPct));
+      return risk === undefined ? {} : { maxTradeRiskUsd: risk };
+    })(),
+  };
 }
 
 export interface AccountState {
@@ -139,7 +178,8 @@ export class RiskEngine {
    * can still close positions, but cannot open or add to them.
    */
   isHalted(state: AccountState): boolean {
-    return state.realizedPnlTodayUsd <= -Math.abs(this.limits.dailyLossLimitUsd);
+    const { dailyLossLimitUsd } = effectiveLimits(this.limits, state.accountValueUsd);
+    return state.realizedPnlTodayUsd <= -Math.abs(dailyLossLimitUsd);
   }
 
   /**
@@ -155,6 +195,10 @@ export class RiskEngine {
         reason: `Order size must be a positive number, got ${order.sizeUsd}.`,
       };
     }
+
+    // Percentages are resolved against the account as it is right now, so a
+    // limit written once keeps meaning the same thing as the balance moves.
+    const inForce = effectiveLimits(this.limits, state.accountValueUsd);
 
     // Reduce-only orders lower risk, so they survive a halt and the size and
     // leverage caps. They still respect the allowlist and the rate limit,
@@ -188,7 +232,7 @@ export class RiskEngine {
         allowed: false,
         code: "HALTED_DAILY_LOSS",
         reason:
-          `Daily loss limit of ${usd(this.limits.dailyLossLimitUsd)} ` +
+          `Daily loss limit of ${usd(inForce.dailyLossLimitUsd)} ` +
           `was hit (realised ${usd(state.realizedPnlTodayUsd)}). ` +
           `Only reduce-only orders are accepted until the next UTC day.`,
       };
@@ -227,7 +271,7 @@ export class RiskEngine {
 
     // How far the stop sits, not how big the order is, decides what a losing
     // trade costs. Size and stop distance are only safe together.
-    const maxRisk = this.limits.maxTradeRiskUsd;
+    const maxRisk = inForce.maxTradeRiskUsd;
     if (maxRisk !== undefined && addsRisk && order.riskUsd !== undefined && order.riskUsd > maxRisk) {
       return {
         allowed: false,
@@ -238,13 +282,13 @@ export class RiskEngine {
       };
     }
 
-    if (Math.abs(projected) > this.limits.maxPositionUsd) {
+    if (Math.abs(projected) > inForce.maxPositionUsd) {
       return {
         allowed: false,
         code: "POSITION_TOO_LARGE",
         reason:
           `Would put ${order.symbol} at ${usd(Math.abs(projected))}, ` +
-          `over the ${usd(this.limits.maxPositionUsd)} cap.`,
+          `over the ${usd(inForce.maxPositionUsd)} cap.`,
       };
     }
 

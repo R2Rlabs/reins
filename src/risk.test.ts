@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RiskEngine, type AccountState, type RiskLimits } from "./risk.js";
+import { RiskEngine, effectiveLimits, type AccountState, type RiskLimits } from "./risk.js";
 
 const limits: RiskLimits = {
   maxPositionUsd: 25_000,
@@ -375,5 +375,106 @@ describe("minLiquidationDistancePct", () => {
     const engine = new RiskEngine(guarded);
     const state = { ...nearLiquidation, liquidationDistancePct: { BTC: Number.NaN } };
     expect(engine.check({ symbol: "BTC", side: "buy", sizeUsd: 1_000 }, state).allowed).toBe(true);
+  });
+});
+
+describe("limits as a percentage of the account", () => {
+  const pct: RiskLimits = {
+    maxPositionUsd: Number.POSITIVE_INFINITY,
+    maxLeverage: 10,
+    dailyLossLimitUsd: Number.POSITIVE_INFINITY,
+    symbolAllowlist: ["BTC"],
+    maxOrdersPerMinute: 12,
+    maxPositionPct: 20,
+    dailyLossLimitPct: 2,
+    maxTradeRiskPct: 1,
+  };
+
+  const account = (accountValueUsd: number, realizedPnlTodayUsd = 0): AccountState => ({
+    positionsUsd: {},
+    realizedPnlTodayUsd,
+    accountValueUsd,
+  });
+
+  it("resolves the position cap against the balance it is handed", () => {
+    const engine = new RiskEngine(pct);
+    // 20% of $10,000 is $2,000.
+    expect(engine.check({ symbol: "BTC", side: "buy", sizeUsd: 2_000 }, account(10_000)).allowed).toBe(
+      true,
+    );
+    const refused = engine.check({ symbol: "BTC", side: "buy", sizeUsd: 2_001 }, account(10_000));
+    expect(refused).toMatchObject({ allowed: false, code: "POSITION_TOO_LARGE" });
+  });
+
+  it("moves with the account instead of going stale", () => {
+    const engine = new RiskEngine(pct);
+    // The same order that was fine at $10,000 is too large once halved.
+    expect(engine.check({ symbol: "BTC", side: "buy", sizeUsd: 2_000 }, account(5_000)).allowed).toBe(
+      false,
+    );
+    expect(engine.check({ symbol: "BTC", side: "buy", sizeUsd: 2_000 }, account(20_000)).allowed).toBe(
+      true,
+    );
+  });
+
+  it("halts on a percentage of the account's own value", () => {
+    const engine = new RiskEngine(pct);
+    // 2% of $10,000 is $200.
+    expect(engine.isHalted(account(10_000, -199))).toBe(false);
+    expect(engine.isHalted(account(10_000, -200))).toBe(true);
+    // The same loss on a bigger account is not a halt.
+    expect(engine.isHalted(account(50_000, -200))).toBe(false);
+  });
+
+  it("caps per-trade risk as a percentage too", () => {
+    const engine = new RiskEngine(pct);
+    const order = { symbol: "BTC", side: "buy" as const, sizeUsd: 1_000, riskUsd: 101 };
+    // 1% of $10,000 is $100.
+    expect(engine.check(order, account(10_000))).toMatchObject({
+      allowed: false,
+      code: "TRADE_RISK_TOO_LARGE",
+    });
+    expect(engine.check({ ...order, riskUsd: 99 }, account(10_000)).allowed).toBe(true);
+  });
+
+  it("takes the tighter of a dollar limit and a percentage", () => {
+    const both = new RiskEngine({ ...pct, maxPositionUsd: 500 });
+    // The dollar cap is tighter than 20% of $10,000, so it wins.
+    expect(both.check({ symbol: "BTC", side: "buy", sizeUsd: 600 }, account(10_000)).allowed).toBe(
+      false,
+    );
+    const loose = new RiskEngine({ ...pct, maxPositionUsd: 5_000 });
+    // The percentage is tighter, so adding a dollar cap cannot loosen it.
+    expect(loose.check({ symbol: "BTC", side: "buy", sizeUsd: 2_500 }, account(10_000)).allowed).toBe(
+      false,
+    );
+  });
+
+  it("falls back to the dollar limits when the account value is unusable", () => {
+    const engine = new RiskEngine({ ...pct, maxPositionUsd: 1_000 });
+    // A zero account is refused for leverage anyway, but the cap must not
+    // silently become zero and refuse with the wrong reason.
+    const decision = engine.check({ symbol: "BTC", side: "buy", sizeUsd: 900 }, account(0));
+    expect(decision).toMatchObject({ allowed: false, code: "LEVERAGE_TOO_HIGH" });
+  });
+});
+
+describe("effectiveLimits", () => {
+  it("reports what the percentages come to", () => {
+    expect(
+      effectiveLimits(
+        {
+          maxPositionUsd: Number.POSITIVE_INFINITY,
+          maxLeverage: 3,
+          dailyLossLimitUsd: Number.POSITIVE_INFINITY,
+          symbolAllowlist: ["BTC"],
+          maxOrdersPerMinute: 12,
+          maxPositionPct: 25,
+          dailyLossLimitPct: 2,
+          maxTradeRiskPct: 0.5,
+        },
+        8_000,
+      ),
+    ).toEqual({ maxPositionUsd: 2_000, dailyLossLimitUsd: 160, maxTradeRiskUsd: 40 });
   });
 });
