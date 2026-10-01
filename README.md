@@ -370,7 +370,42 @@ otherwise, and every route but `/health` needs the bearer token. Exposing it
 beyond your own machine means choosing your own token and putting TLS in front
 of it.
 
-A working example in 40 lines of Python, sizing its order from the stop:
+### From Python
+
+Most Hyperliquid bots are Python, so there is a client rather than a snippet:
+
+```bash
+pip install reins-client
+```
+
+```python
+from reins import Reins, Refused
+
+reins = Reins.from_env()                 # REINS_URL, REINS_HTTP_TOKEN
+book = reins.book("BTC")
+entry, stop = book["bestAsk"], book["bestBid"] * 0.99
+
+try:
+    reins.place_order(
+        symbol="BTC",
+        side="buy",
+        size_usd=Reins.size_for_risk(entry, stop, risk_usd=25),
+        price=entry,
+        stop_loss=stop,
+        reason="range low held on the hourly",
+    )
+except Refused as refusal:
+    print(refusal.code, refusal.reason)  # e.g. TRADE_RISK_TOO_LARGE
+```
+
+A refusal is not an error in your code — it is Reins doing its job — so it
+arrives as `Refused` with the code, and a bot can branch on it.
+`size_for_risk()` is the same arithmetic the risk engine checks, so an order
+can be sized into the per-trade limit instead of being refused by it. No
+dependencies: [`clients/python`](clients/python) is one stdlib file, vendorable
+if you would rather not add a package.
+
+Or without the client at all, in 40 lines of plain Python:
 [`examples/bot.py`](examples/bot.py).
 
 ### Checking it against the real exchange

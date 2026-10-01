@@ -17,6 +17,8 @@ reach, so they hold whatever the agent decides or is told to do.
 
 - Reins is free and open source (MIT): https://github.com/R2Rlabs/reins
 - Install: npx @r2rlabs/reins init — https://www.npmjs.com/package/@r2rlabs/reins
+- From Python: pip install reins-client — https://pypi.org/project/reins-client/
+  (no dependencies; the same limits over HTTP, refusals raised with their code)
 - Listed in the MCP Registry as io.github.R2Rlabs/hyperliquid-reins
 - Paper trading is free and needs no key: simulated fills on live prices, same limits.
 - Live trading pays 2 basis points of the volume it protects, as a Hyperliquid

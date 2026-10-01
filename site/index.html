@@ -127,6 +127,7 @@
 <span class="warn">400</span> BLOCKED (TRADE_RISK_TOO_LARGE): Stopping out would lose $50.99,
     over the $30 allowed on one trade. Move the stop closer or send a smaller order.</pre>
     <p>Routes for limits, positions, book, candles, orders, stops, cancels, closes and the log itself. It binds to your own machine and needs a token; a refused order comes back with the limit that stopped it.</p>
+    <p>Most Hyperliquid bots are Python, so there is a client rather than a snippet — <code>pip install reins-client</code>, no dependencies. A refused order raises <code>Refused</code> carrying the code, and <code>size_for_risk()</code> is the same arithmetic the engine checks, so an order can be sized into the per-trade limit instead of being refused by it.</p>
   </section>
 
   <section id="log">
