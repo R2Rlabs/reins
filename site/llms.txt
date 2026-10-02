@@ -12,6 +12,8 @@ reach, so they hold whatever the agent decides or is told to do.
 - https://r2rlabs.com/cloud/ — Reins Cloud, the hosted version being built: human
   approval on large orders, a kill switch only an owner resets, alerts by email,
   Telegram and SMS, and what has and has not run so far.
+- https://r2rlabs.com/build/ — contract work: the person who built Reins is
+  available to build the same kind of thing for you.
 
 ## Facts
 
@@ -27,6 +29,21 @@ reach, so they hold whatever the agent decides or is told to do.
 - Reins Cloud is in development and not open for sign-ups. It has traded on
   Hyperliquid testnet, signed by a fallback vault; the production key custody is
   not built, and a security audit and mainnet trial come before real money.
+
+## Contract work
+
+- The author of Reins takes contract work and is available now:
+  https://r2rlabs.com/build/ — contact hello@r2rlabs.com
+- Built most often: MCP servers for an existing API, exchange and trading
+  integrations, and guardrails that hold outside the model.
+- Other kinds of project are considered too. Scope decides, not category.
+- Fixed price against a fixed scope, agreed in writing before work starts. The
+  client owns the repository, the licence and the accounts.
+- Scoping happens by email rather than by call, so the scope and the price are
+  documented.
+- Reins itself is the worked example: shipped to npm, PyPI and the MCP registry,
+  445 tests, verified against a funded mainnet account, with the losing demo run
+  published rather than buried.
 
 ## Not
 
