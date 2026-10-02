@@ -8,12 +8,12 @@
     "url": "https://github.com/R2Rlabs/reins",
     "source": "github"
   },
-  "version": "0.1.7",
+  "version": "0.1.8",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@r2rlabs/reins",
-      "version": "0.1.7",
+      "version": "0.1.8",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

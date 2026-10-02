@@ -1,6 +1,6 @@
 {
   "name": "@r2rlabs/reins",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Execution layer for trading agents on Hyperliquid — risk limits enforced outside the model.",
   "license": "MIT",
   "repository": {
