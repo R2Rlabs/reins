@@ -28,7 +28,7 @@ export interface McpServerDeps {
   newId?: () => string;
 }
 
-const DEFAULT_CROSS_BUFFER = 0.001;
+export const DEFAULT_CROSS_BUFFER = 0.001;
 
 /** The SDK's own result type — a union, so don't hand-roll a narrower one. */
 export type ToolResult = CallToolResult;

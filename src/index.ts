@@ -19,7 +19,7 @@ export {
   feeApprovalProblem,
 } from "./builder-fee.js";
 
-export { RiskEngine, projectedPositionUsd, projectedTotalExposureUsd } from "./risk.js";
+export { RiskEngine, effectiveLimits, projectedPositionUsd, projectedTotalExposureUsd } from "./risk.js";
 export type {
   AccountState,
   Decision,
@@ -33,6 +33,7 @@ export { formatPrice, formatSize } from "./format.js";
 export {
   createMcpServer,
   marketablePrice,
+  DEFAULT_CROSS_BUFFER,
   getLimits,
   getPositions,
   getBook,
